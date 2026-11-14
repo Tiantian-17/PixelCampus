@@ -3,9 +3,12 @@ import { Character, type Facing } from '@/entities/Player';
 import { WALK_SPEED, TILE } from '@/core/const';
 import { inPlaza } from '@/shared/plaza';
 import type { WorldMap } from '@/world/WorldMap';
+import type { TrainerDef } from '@/shared/trainers';
 
 /** 校园里游走的行人：随机选近处目标走过去，停一会儿再走。 */
 export class Npc extends Character {
+  /** 训练家 NPC 的定义（普通行人是 null） */
+  trainer: TrainerDef | null = null;
   private tx: number; private ty: number;
   private wait = 0;
   /** 室内溜达范围（像素矩形）：设了就在这个范围里挑目标，也不做广场判断（室内没有广场） */

@@ -51,11 +51,18 @@ export type BEvent =
   /** 守住了对方的攻击 */
   | { t: 'guard'; side: Side }
   /** 保护失败（连续使用衰减） */
-  | { t: 'guardfail'; side: Side };
+  | { t: 'guardfail'; side: Side }
+  /** 对方（训练家）换人：i = foeSquad 下标 */
+  | { t: 'foeswap'; i: number };
 
 export interface Battle {
   bid: string;
   turn: number;
+  /** 对方队伍（野生精灵是长度 1 的特例；训练家有多只） */
+  foeSquad: Mon[];
+  /** 对方当前上场在 foeSquad 里的下标 */
+  foeLead: number;
+  /** 兼容别名：野生战斗中就是 foeSquad[0] */
   wild: Mon;
   squad: Mon[];
   /** 当前首发在 squad 里的下标 */
@@ -88,8 +95,21 @@ export interface StepResult { ok: boolean; err?: string; ev: BEvent[] }
 export function startBattle(bid: string, wild: Mon, squad: Mon[]): Battle {
   const lead = squad.findIndex((m) => m.hp > 0);
   if (lead < 0) throw new Error('队伍里没有能战斗的精灵');
-  return { bid, turn: 1, wild, squad, lead, fought: [lead], phase: 'choose', runs: 0, stages: new Map(), status: new Map(), guardChain: new Map(), guarding: new Map() };
+  return { bid, turn: 1, foeSquad: [wild], foeLead: 0, wild, squad, lead, fought: [lead], phase: 'choose', runs: 0, stages: new Map(), status: new Map(), guardChain: new Map(), guarding: new Map() };
 }
+
+/** 训练家对战：对方也是队伍（第一只活的上场） */
+export function startTrainerBattle(bid: string, foeSquad: Mon[], squad: Mon[]): Battle {
+  const lead = squad.findIndex((m) => m.hp > 0);
+  const foeLead = foeSquad.findIndex((m) => m.hp > 0);
+  if (lead < 0 || foeLead < 0) throw new Error('队伍里没有能战斗的精灵');
+  return { bid, turn: 1, foeSquad, foeLead, wild: foeSquad[foeLead], squad, lead, fought: [lead], phase: 'choose', runs: 0, stages: new Map(), status: new Map(), guardChain: new Map(), guarding: new Map() };
+}
+
+/** 对方当前上场的精灵 */
+export const foeOf = (b: Battle): Mon => b.foeSquad[b.foeLead] ?? b.wild;
+/** 对方还有没有能战斗的 */
+export const foeAlive = (b: Battle): boolean => b.foeSquad.some((m) => m.hp > 0);
 
 
 /** 取某个精灵的能力等级（没有就建一份全 0 的） */
@@ -173,7 +193,7 @@ const moveOf = (ct: Content, id: string): Move => ct.moves.get(id) ?? STRUGGLE;
 export function step(ct: Content, b: Battle, act: Action, rnd: Rng): StepResult {
   if (b.phase === 'over') return { ok: false, err: '战斗已经结束', ev: [] };
   const ev: BEvent[] = [];
-  const me = () => b.squad[b.lead], foe = b.wild;
+  const me = () => b.squad[b.lead], foe = foeOf(b);
   const mySt = (): Stats => monStats(ct, me()), foeSt = (): Stats => monStats(ct, foe);
   const mySp = () => ct.species.get(me().sp)!, foeSp = () => ct.species.get(foe.sp)!;
 
@@ -186,9 +206,10 @@ export function step(ct: Content, b: Battle, act: Action, rnd: Rng): StepResult 
     return { ok: true, ev };
   }
 
-  // ---- 校验行动
+  // ---- 校验行动（睡着 / 冻住时已知不能行动，直接跳过校验，后面只推进回合）
+  const hardBlocked = hasStatus(b, me(), 'sleep') || hasStatus(b, me(), 'freeze');
   let mv: Move | null = null, slot = -1;
-  if (act.t === 'move') {
+  if (hardBlocked) { /* 不校验，交给 canMyAct 处理 */ } else if (act.t === 'move') {
     const mon = me();
     if (!Number.isInteger(act.i) || act.i < 0 || act.i >= mon.mv.length) return { ok: false, err: '没有这个技能', ev };
     if (mon.mv[act.i].pp <= 0 && mon.mv.some((x) => x.pp > 0)) return { ok: false, err: '这个技能的 PP 用完了', ev };
@@ -268,11 +289,10 @@ export function step(ct: Content, b: Battle, act: Action, rnd: Rng): StepResult 
   const myAct = canMyAct();
   const foeAct = canFoeAct();
 
-  if (act.t === 'move' && mv) {
-    if (!myAct) {
-      // 自己不能行动：本回合什么都不做，但野生精灵仍可能行动
-      if (foeAct) foeTurn();
-    } else {
+  if (!myAct) {
+    // 不能行动：无论客户端提交什么（出招 / 换人 / 扔球 / 逃跑）都只推进回合，不执行该行动
+    if (foeAct) foeTurn();
+  } else if (act.t === 'move' && mv) {
       if (slot >= 0 && mv !== STRUGGLE) me().mv[slot].pp--;
       // 非伤害招式：回复 / 保护 / 变化
       const nonDamage = !mv.power && (mv.heal || mv.guard || mv.stat);
@@ -319,11 +339,7 @@ export function step(ct: Content, b: Battle, act: Action, rnd: Rng): StepResult 
         const myFirst = (mv.priority ?? 0) !== 0 ? (mv.priority ?? 0) > 0 : mySpe !== foeSpe ? mySpe > foeSpe : rnd() < 0.5;
         if (myFirst) { if (attack('me', mv)) over = true; else if (foeAct) foeTurn(); }
         else { if (foeAct) attack('foe', wildMove()); if (me().hp > 0) { if (attack('me', mv)) over = true; } }
-      }
     }
-  } else if (!myAct) {
-    // 不能行动：换人 / 扔球 / 逃跑也一并无效；野生精灵照常行动
-    if (foeAct) foeTurn();
   } else if (act.t === 'swap') {
     b.guardChain.delete(me().id);
     b.lead = act.i; if (!b.fought.includes(act.i)) b.fought.push(act.i);
@@ -365,6 +381,14 @@ export function step(ct: Content, b: Battle, act: Action, rnd: Rng): StepResult 
 
   // ---- 判胜负
   if (foe.hp <= 0) {
+    // 训练家：对方换人，战斗继续（经验在最终胜利时结算）
+    const next = b.foeSquad.findIndex((m) => m.hp > 0);
+    if (b.foeSquad.length > 1 && next >= 0) {
+      b.foeLead = next; b.wild = b.foeSquad[next];
+      ev.push({ t: 'foeswap', i: next });
+      b.turn++;
+      return { ok: true, ev };
+    }
     b.phase = 'over'; b.result = 'win';
     for (const i of b.fought) {
       const m = b.squad[i]; if (!m || m.hp <= 0) continue;

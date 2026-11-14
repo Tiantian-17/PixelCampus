@@ -55,12 +55,14 @@ describe('战斗界面 · 非伤害招式', () => {
     expect(moves[1]).toContain('攻击 +2');
   });
 
-  it('P11：睡 / 冻 / 麻痹时非伤害招式也被禁用', async () => {
+  it('P11：睡 / 冻时显示无法行动的提示，并自动提交一次行动推进回合（按钮不再禁用，否则会卡住）', async () => {
     await send(bt());
     await send(bt({ turn: 2, ev: [{ t: 'status', side: 'me', k: 'sleep', v: 2 }, { t: 'blocked', side: 'me', k: 'sleep' }] }));
     const btns = [...document.querySelectorAll('.bt-menu button')] as HTMLButtonElement[];
     expect(btns.length).toBeGreaterThan(0);
-    expect(btns.filter((b) => b.textContent === '战斗').every((b) => b.disabled)).toBe(true);
+    expect(btns.every((b) => b.disabled)).toBe(false);
+    await tick();
+    expect(net.monAct).toHaveBeenCalled();
   });
 
   it('moveDesc 覆盖回复 / 变化 / 保护 / 吸取', () => {

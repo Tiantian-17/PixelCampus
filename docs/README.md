@@ -87,6 +87,8 @@ docs/
 | [feature/20261112-fishing-broadcast/](feature/20261112-fishing-broadcast/spec.md) | 钓鱼全服播报：神话鱼 / 破个人纪录触发，世界频道 + 金色横幅（协作者开发客户端与共享规则，服务端由维护者补齐，已上线） |
 | [feature/20261112-battle-nondamage/](feature/20261112-battle-nondamage/spec.md) | 战斗深度 2A-3：非伤害招式（回复 / 变化 / 保护）、命中闪避接入、状态共存（协作者开发，随 #24 一起上线） |
 | [feature/20261112-move-library/](feature/20261112-move-library/spec.md) | 技能库扩充：每属性 6 个定位不同的招式 + 初始三只专属招 + 反伤机制（协作者开发，已上线） |
+| [feature/20261113-trainer-npc/](feature/20261113-trainer-npc/spec.md) | 训练家 NPC：双方队伍结构、AI、切磋与奖励，北山密林 10–20 级区域（协作者开发，公开 + 服务端 PR 一起上线） |
+| [feature/20261114-pvp/](feature/20261114-pvp/spec.md) | 玩家对战（PvP）：spec / plan 定稿，尚未实现（协作者） |
 - 每个新功能复制成 `docs/feature/<YYYYMMDD-功能名>/spec.md` + `plan.md`；**先 spec、主人确认，再 plan、主人确认，再写代码**。
 - 2026-11-10 起 spec 和 plan **都进公开仓库**：不要写服务器地址、口令、玩家数据（运维细节写到私有文档）。
 

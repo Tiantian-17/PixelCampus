@@ -24,6 +24,8 @@ export interface MonSave {
   dm?: 1;
   /** 已经收服过的校园猫编号（每只猫每个玩家只能收服一次：好感度满值收服或对战中收服都算） */
   ct?: number[];
+  /** 打败过的训练家 id（首次胜利发奖励；只增不减） */
+  trainers?: string[];
 }
 export interface OpResult { ok: boolean; msg: string }
 
@@ -59,6 +61,7 @@ export function cleanMonSave(raw: unknown, ct: Content): MonSave | undefined {
   const s: MonSave = { sq: list(r.sq, MON.SQUAD_MAX), bx: list(r.bx, MON.BOX_MAX), dex, starter: r.starter === true, n: int(r.n, 0, 1e9, 0) };
   if (Array.isArray(r.ct)) { const ct = [...new Set(r.ct.filter((c): c is number => Number.isInteger(c) && c >= 0 && c < 256))].slice(0, 64); if (ct.length) s.ct = ct; }
   if (r.rt !== undefined) { const rt = int(r.rt, 0, 8.64e15, 0); if (rt) s.rt = rt; }
+  if (Array.isArray(r.trainers)) { const tr = [...new Set(r.trainers.filter((x): x is string => typeof x === 'string' && /^[a-z0-9]{1,16}$/.test(x)))].slice(0, 32); if (tr.length) s.trainers = tr; }
   if (r.dm === 1) s.dm = 1;
   return s;
 }
