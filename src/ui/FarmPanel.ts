@@ -162,7 +162,8 @@ export class FarmPanel {
           const seed = cropOfSeed(this.seed);
           if (seed) {
             const why = canPlant(seed.id);
-            btn('播种', 'plant', { seed: seed.id, disabled: why.ok ? undefined : why.why });
+            // seed 传的是种子物品 id（this.seed，如 seed_cabbage）：服务端用 cropOfSeed 校验，传作物 id 会被当成「没有这种种子」
+            btn('播种', 'plant', { seed: this.seed, disabled: why.ok ? undefined : why.why });
           }
         }
       } else if (stage === 'ripe') {
