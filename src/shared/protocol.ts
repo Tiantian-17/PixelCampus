@@ -282,6 +282,8 @@ export type ClientMsg =
   | { t: 'mon_free'; id: string }
   /** 学 / 换技能：move 必须是服务器下发的 learnable 里的；drop = -1 放空槽，>= 0 替换该下标 */
   | { t: 'mon_replace'; id: string; move: string; drop: number }
+  /** 和训练家 NPC 切磋：id 见 shared/trainers.ts */
+  | { t: 'trainer_battle'; id: string }
   /** 野外遭遇：迎战 / 走开；战斗行动（bid 与回合号必须是服务器当前的；捕捉的倍率由服务器按背包里的道具定） */
   /** 手拉手：邀请好友 / 接受（uid = 邀请我的人）/ 拒绝 / 松手 */
   | { t: 'hand_invite'; uid: number }
@@ -524,7 +526,7 @@ export type ServerMsg =
   | { t: 'mon_enc'; sp: string; lv: number; sh?: 1; zone: string; ms: number }
   | { t: 'mon_enc_end' }
   /** 战斗状态（结算后的权威状态 + 这一回合发生的事件，客户端按事件播放动画）；foe 只含对手公开的信息 */
-  | { t: 'mon_bt'; bid: string; turn: number; phase: 'choose' | 'swap' | 'over'; result?: 'win' | 'lose' | 'caught' | 'fled'; lead: number; sq: Mon[]; foe: { sp: string; lv: number; hp: number; max: number; sh?: 1 }; ev: BEvent[]; ball: number; zone: string; /** 对手是校园小猫（友谊赛）：猫编号与名字 */ cat?: { id: number; name: string } }
+  | { t: 'mon_bt'; bid: string; turn: number; phase: 'choose' | 'swap' | 'over'; result?: 'win' | 'lose' | 'caught' | 'fled'; lead: number; sq: Mon[]; foe: { sp: string; lv: number; hp: number; max: number; sh?: 1 }; ev: BEvent[]; ball: number; zone: string; /** 对手是校园小猫（友谊赛）：猫编号与名字 */ cat?: { id: number; name: string }; /** 训练家对战：训练家信息与对方队伍（按上场顺序） */ trainer?: { id: string; name: string; squad?: { sp: string; lv: number; hp: number; max: number; sh?: 1 }[] } }
   | { t: 'restored'; ok: boolean; profile?: Profile; msg?: string };
 
 /** token：客户端随机生成，只用来"记住你"。16–64 位字母数字/横线/下划线 */

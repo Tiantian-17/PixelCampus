@@ -66,12 +66,15 @@ describe('战斗界面 · 状态异常', () => {
     expect(document.querySelector('.bt-card.foe .bt-status.sleep')).toBeNull();
   });
 
-  it('P12：玩家被睡住时按钮禁用并提示', async () => {
+  it('P12：玩家被睡住时显示提示，并自动提交一次行动（防死锁）', async () => {
     await send(bt());
     await send(bt({ turn: 2, ev: [{ t: 'status', side: 'me', k: 'sleep', v: 1 }, { t: 'blocked', side: 'me', k: 'sleep' }] }));
     expect(document.querySelector('.bt-blocked')?.textContent).toContain('无法行动');
+    // 按钮不再全部禁用（否则服务器等不到行动会卡住）
     const btns = [...document.querySelectorAll('.bt-menu button')] as HTMLButtonElement[];
     expect(btns.length).toBeGreaterThan(0);
-    expect(btns.every((b) => b.disabled)).toBe(true);
+    expect(btns.every((b) => b.disabled)).toBe(false);
+    await tick();
+    expect(net.monAct).toHaveBeenCalled();
   });
 });

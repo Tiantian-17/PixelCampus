@@ -126,10 +126,25 @@ export function runAct(sc: WorldScene, a: Act) {
       npc.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       npc.sprite.setFrame(`c${npc.look}_${npc.facing}_0`);
       npc.pause(2.5);
+      if (npc.trainer) { openTrainerAsk(sc, npc); break; }
       sc.hud.openDialog(npc.name, npc.lines);
       break;
     }
   }
+}
+
+/** 训练家对话：先问要不要切磋；确认后向服务器请求开战 */
+function openTrainerAsk(sc: WorldScene, npc: Npc) {
+  const t = npc.trainer!;
+  sc.hud.openDialog(t.name, [t.before]);
+  // 对话底部追加两个按钮（复用 hud 的 dialog 容器）
+  const foot = document.getElementById('dialog-foot'); if (!foot) return;
+  foot.replaceChildren();
+  const yes = document.createElement('button'); yes.className = 'btn primary'; yes.type = 'button'; yes.textContent = '切磋';
+  const no = document.createElement('button'); no.className = 'btn'; no.type = 'button'; no.textContent = '下次吧';
+  yes.addEventListener('click', (e) => { e.stopPropagation(); sc.hud.closeDialog(); sc.net.trainerBattle(t.id); });
+  no.addEventListener('click', (e) => { e.stopPropagation(); sc.hud.closeDialog(); });
+  foot.append(yes, no);
 }
 
 export function updateInteraction(sc: WorldScene) {

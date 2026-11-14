@@ -9,6 +9,7 @@ import { sfx } from '@/audio/sfx';
 import { allCats } from '@/shared/cats';
 import { gateBikes } from '@/shared/bikes';
 import type { WorldScene } from '../WorldScene';
+import { TRAINERS } from '@/shared/trainers';
 
 const CHAT = [
   '早八真的太难了……', '去图书馆怎么走？沿着中轴线一直往北就是。', '精工湖边的垂柳春天最好看。', '食堂的红烧肉去晚就没了。',
@@ -27,6 +28,17 @@ export function spawnNpcs(sc: WorldScene) {
     const l1 = CHAT[Math.floor(sc.rand() * CHAT.length)];
     const l2 = CHAT[Math.floor(sc.rand() * CHAT.length)];
     sc.npcs.push(new Npc(sc, tx * TILE, ty * TILE, look, '同学', [l1, l2], true, 'down'));
+  }
+}
+
+/** 训练家 NPC：按 shared/trainers.ts 的坐标放置，常驻不游走 */
+export function spawnTrainers(sc: WorldScene) {
+  const count = (sc.cache.json.get('charsMeta') as { count: number }).count;
+  for (const t of TRAINERS) {
+    const n = new Npc(sc, t.tx * TILE, t.ty * TILE, Math.min(t.look, count - 1), t.name, [t.before], false, 'down');
+    n.trainer = t;
+    sc.trainers.set(t.id, n);
+    sc.npcs.push(n);
   }
 }
 

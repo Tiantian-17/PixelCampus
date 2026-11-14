@@ -68,7 +68,7 @@ import { standUp, updateAudio } from './world/actions';
 import { applyZoom, changeZoom } from './world/camera';
 import { checkDawn, loadSeason, updateClock } from './world/clock';
 import { buildTrackMarks, drawHandLinks, drawRunMark, onBikeCrash } from './world/effects';
-import { buildBikes, spawnCats, spawnKeeper, spawnNpcs, updateCreatures, updateKeeper } from './world/entities';
+import { buildBikes, spawnCats, spawnKeeper, spawnNpcs, spawnTrainers, updateCreatures, updateKeeper } from './world/entities';
 import { fishLockState, stopFishing } from './world/fishing';
 import { mainHotkeys, overlayKeys } from './world/hotkeys';
 import { updateInteraction } from './world/interaction';
@@ -105,6 +105,8 @@ export class WorldScene extends Phaser.Scene {
   npcs: Npc[] = [];
   /** 精工湖钓具摊旁的固定 NPC「钓具老板」+ 名字牌 + 头顶的「！」（有委托奖励可以领时） */
   keeper: Npc | null = null; keeperTag: Phaser.GameObjects.Text | null = null; keeperMark: Phaser.GameObjects.Text | null = null;
+  /** 训练家 NPC（按 shared/trainers.ts 的位置生成；id → 实体） */
+  trainers = new Map<string, Npc>();
   entering = false;
   enterPos: { x: number; y: number } | null = null;
   rand = Math.random;
@@ -255,6 +257,7 @@ export class WorldScene extends Phaser.Scene {
     RemotePlayer.findSeat = (x, y) => { const s = nearestSeat(this.seats, x, y, 30); return s && { bx: s.bx, by: s.by }; };
     buildTrackMarks(this);
     spawnNpcs(this);
+    spawnTrainers(this);
     spawnCats(this);
     if (this.water) this.lakeBirds = new LakeBirds(this, this.water);
     spawnKeeper(this);

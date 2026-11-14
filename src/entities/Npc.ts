@@ -3,9 +3,12 @@ import { Character, type Facing } from '@/entities/Player';
 import { WALK_SPEED, TILE } from '@/core/const';
 import { inPlaza } from '@/shared/plaza';
 import type { WorldMap } from '@/world/WorldMap';
+import type { TrainerDef } from '@/shared/trainers';
 
 /** 校园里游走的行人：随机选近处目标走过去，停一会儿再走。 */
 export class Npc extends Character {
+  /** 训练家 NPC 的定义（普通行人是 null） */
+  trainer: TrainerDef | null = null;
   private tx: number; private ty: number;
   private wait = 0;
   constructor(scene: Phaser.Scene, x: number, y: number, look: number, readonly name: string, readonly lines: string[], private wander = true, facing: Facing = 'down') {

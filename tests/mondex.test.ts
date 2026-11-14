@@ -101,8 +101,8 @@ describe('精灵图鉴 · 筛选', () => {
     expect(monDexRows(CONTENT, dex, ZONES, {})).toHaveLength(83);
   });
 
-  it('P8：区域选项 = 三野外 + 校园猫 + 登录赠送', () => {
-    expect(monDexZoneOptions(ZONES).map((z) => z.id)).toEqual(['lake', 'grove', 'hill', 'cat', 'dm']);
+  it('P8：区域选项 = 野外区域 + 校园猫 + 登录赠送', () => {
+    expect(monDexZoneOptions(ZONES).map((z) => z.id)).toEqual(['lake', 'grove', 'hill', 'hill-deep', 'cat', 'dm']);
   });
 });
 
