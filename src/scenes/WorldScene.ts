@@ -30,6 +30,7 @@ import { BackpackPanel } from '@/ui/BackpackPanel';
 import { MonPanel } from '@/ui/MonPanel';
 import { BattleUi } from '@/ui/BattleUi';
 import { TeleportPanel } from '@/ui/TeleportPanel';
+import { FarmPanel } from '@/ui/FarmPanel';
 import { DormPanel } from '@/ui/DormPanel';
 import { WorldPanel } from '@/ui/WorldPanel';
 import { HandUi } from '@/ui/HandUi';
@@ -141,6 +142,7 @@ export class WorldScene extends Phaser.Scene {
   monUi!: MonPanel;
   battleUi!: BattleUi;
   tpUi!: TeleportPanel;
+  farmUi!: FarmPanel;
   dormUi!: DormPanel;
   worldUi!: WorldPanel;
   handUi!: HandUi;

@@ -11,6 +11,8 @@ export class Npc extends Character {
   trainer: TrainerDef | null = null;
   private tx: number; private ty: number;
   private wait = 0;
+  /** 室内溜达范围（像素矩形）：设了就在这个范围里挑目标，也不做广场判断（室内没有广场） */
+  box?: { x0: number; y0: number; x1: number; y1: number };
   constructor(scene: Phaser.Scene, x: number, y: number, look: number, readonly name: string, readonly lines: string[], private wander = true, facing: Facing = 'down') {
     super(scene, x, y, look);
     this.tx = x; this.ty = y; this.facing = facing; this.animScale = 0.6;
@@ -28,13 +30,16 @@ export class Npc extends Character {
       this.wait = 1 + rng() * 4;
       const a = rng() * Math.PI * 2, r = 24 + rng() * 80;
       this.tx = this.x + Math.cos(a) * r; this.ty = this.y + Math.sin(a) * r;
-      if (inPlaza(this.tx / TILE, this.ty / TILE)) { this.tx = this.x; this.ty = this.y; } // 不往图书馆广场里走
+      if (this.box) { // 室内：夹在活动范围里，别走到墙里/田里
+        this.tx = Math.min(this.box.x1, Math.max(this.box.x0, this.tx));
+        this.ty = Math.min(this.box.y1, Math.max(this.box.y0, this.ty));
+      } else if (inPlaza(this.tx / TILE, this.ty / TILE)) { this.tx = this.x; this.ty = this.y; } // 不往图书馆广场里走
       this.moving = false; this.play(); return;
     }
     const sp = WALK_SPEED * 0.55 * dt;
     const mx = (dx / d) * sp, my = (dy / d) * sp;
     const p = world.move(this.x, this.y, mx, my);
-    const intoPlaza = inPlaza(p.x / TILE, p.y / TILE) && !inPlaza(this.x / TILE, this.y / TILE);
+    const intoPlaza = !this.box && inPlaza(p.x / TILE, p.y / TILE) && !inPlaza(this.x / TILE, this.y / TILE);
     if (intoPlaza || (p.x === this.x && p.y === this.y)) { this.tx = this.x; this.ty = this.y; this.wait = 0.4; this.moving = false; }
     else { this.moving = true; this.x = p.x; this.y = p.y; }
     if (Math.abs(dx) > Math.abs(dy)) this.facing = dx > 0 ? 'right' : 'left'; else this.facing = dy > 0 ? 'down' : 'up';

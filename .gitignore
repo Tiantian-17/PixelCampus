@@ -20,6 +20,10 @@ archive/legacy-handoff-*/
 # 本地预览配置
 .claude/
 
+# 本地环境变量（测试服地址等属于共享秘密，不进版本库）
+.env.local
+.env.*.local
+
 data/mons/packs/local-*/
 data/mons/packs/local-*/
 

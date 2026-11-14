@@ -47,6 +47,7 @@ import { PartyPanel } from '@/ui/PartyPanel';
 import { CodexPanel } from '@/ui/CodexPanel';
 import { HallPanel } from '@/ui/HallPanel';
 import { PlacePanel, closeLightbox, lightboxOpen } from '@/ui/PlacePanel';
+import { FarmPanel } from '@/ui/FarmPanel';
 import { TradePanel } from '@/ui/TradePanel';
 import { FishFightUi } from '@/ui/FishFightUi';
 import { FishCard } from '@/ui/FishCard';
@@ -67,7 +68,7 @@ import { catAction, closeCat, refreshCatPanel } from './cats';
 import { addDropped, clearDropped } from './entities';
 import { fishBlocked, fishLockState, onFishState } from './fishing';
 import { setupPlaceBtn } from './place';
-import { enterDorm, enterFloor } from './transitions';
+import { enterDorm, enterFarm, enterFarmTree, enterFloor } from './transitions';
 import type { WorldScene } from '../WorldScene';
 
 export function wireSocialCore(sc: WorldScene, profile: Profile) {
@@ -121,6 +122,7 @@ export function wireBackpackShop(sc: WorldScene) {
     if ((up.from < 5 && up.to >= 5) || (up.from < 10 && up.to >= 10)) window.setTimeout(() => { sc.hud.banner('🎣 解锁了新的路线槽', '在图鉴的「等级」页选择：渔夫（卖鱼价 +10%）或寻宝（盲盒 ×1.3）'); }, 3200);
   };
   sc.shopUi = new ShopPanel(sc.net, sc.textures, () => marketDay(Date.now() + sc.clock.offset), { openQuests: (tab) => sc.questUi.open(tab) }); // 钓具摊的「📋 钓鱼委托」：打开任务面板的钓鱼页
+  sc.registry.set('shopUi', sc.shopUi); // 农场里的「农场管理员」（室内场景）要用：按 E 打开买种子 / 卖菜
   sc.fightUi = new FishFightUi();
   sc.fishCard = new FishCard(sc.textures);
   sc.fishCard.onRelease = (id) => sc.net.fishRelease(id);
@@ -138,7 +140,36 @@ export function wireHand(sc: WorldScene) {
 }
 
 export function wireWorld(sc: WorldScene) {
-  sc.tpUi = new TeleportPanel(sc.net, (floor) => { sc.hud.banner('📍 传送', '到啦'); sfx('go'); const it = sc.scene.isActive('Interior') ? (sc.scene.get('Interior') as unknown as { teleportOut?: (f?: string) => void }) : null; if (it?.teleportOut) it.teleportOut(floor); else if (floor) enterFloor(sc, floor); }); // 选了某一层：到门口后直接进那一层
+  // 校园农场：一块独立的私人空间（和宿舍一样传送进去），面板负责翻土/播种/浇水/收获与访客
+  sc.farmUi = new FarmPanel(sc.net, sc.textures, {
+    friends: () => sc.socialUi.friendList.map((f) => ({ uid: f.uid, name: SocialUi.label(f) })),
+    season: () => seasonAt(Date.now() + sc.clock.offset),
+    inv: () => sc.backpackUi.inv,
+    // 第一次收获：土里翻出一颗"不像种子"的种子，给以后的「特殊种子 → 植物精灵」留钩子（只弹一次，本机记）
+    harvested: (() => {
+      let fired = false; // 连收好几块地时只弹一次（不等 localStorage，避免 600ms 内重复排队）
+      return () => {
+        if (fired) return;
+        let seen = true; try { seen = !!localStorage.getItem('pixelcampus.farmSeedHint'); } catch { /* 存储不可用就当看过了，别反复打扰 */ }
+        if (seen) return;
+        fired = true;
+        window.setTimeout(() => { // 等收获的那条结果先显示出来，再弹旁白
+          try { localStorage.setItem('pixelcampus.farmSeedHint', '1'); } catch { /* 忽略 */ }
+          sc.hud.openDialog('土里的东西', [
+            '（菜拔出来那一下，手感不对——根须底下连着一团土，捏在手里是温的。）',
+            '（掰开土块，滚出一颗灰扑扑的种子。它比寻常种子沉得多，放在掌心，还顶了一下你的手。）',
+            '（你把它压进种子袋最底层。合上袋口前，你看见它探出一小截根，像脚一样，在地上蹬了蹬。）',
+          ]);
+        }, 600);
+      };
+    })(),
+  });
+  sc.tpUi = new TeleportPanel(sc.net, (floor, id, viaTree) => {
+    if (viaTree) sc.hud.banner('🌳 大树洞', '钻过去了……'); else sc.hud.banner('📍 传送', '到啦'); sfx('go');
+    if (id === 'farm') { (viaTree ? enterFarmTree : enterFarm)(sc); return; } // 传到农场：进入私人农场空间（从大树洞钻的用树洞版：慢暗 → 黑一拍 → 暖光亮起）
+    const it = sc.scene.isActive('Interior') ? (sc.scene.get('Interior') as unknown as { teleportOut?: (f?: string) => void }) : null; // 在室内（宿舍/教室）里点传送：先退出室内再进楼层
+    if (it?.teleportOut) it.teleportOut(floor); else if (floor) enterFloor(sc, floor);
+  }); // 选了某一层：到门口后直接进那一层
   sc.worldUi = new WorldPanel(sc.net, { friends: () => sc.socialUi.friendList, locOf: (u) => sc.socialUi.locOf(u) });
   sc.socialUi.onWorld = (uid) => sc.worldUi.openFor(uid); sc.socialUi.onLocs = () => sc.worldUi.refresh();
   sc.worldUi.onChange = (kind) => { // 换了世界：旧世界里的人物、公屏都不是这个世界的了（服务器会补发这个世界的单车/小猫/牵手/公屏记录）
@@ -156,7 +187,7 @@ export function wireDorm(sc: WorldScene) {
   }
   sc.net.handlers.dormIn = (x, y) => { sc.registry.set('dormVisit', null); enterDorm(sc, x, y); };
   sc.net.handlers.dormVisit = (m) => { sc.registry.set('dormVisit', m); enterDorm(sc, sc.player.x, sc.player.y); }; // 去好友的宿舍做客：出来时回到现在站的地方
-  sc.registry.set('net', sc.net); sc.registry.set('dormUi', sc.dormUi); sc.registry.set('chat', sc.chatUi); sc.registry.set('editProfile', () => sc.editProfile(true)); sc.registry.set('tpUi', sc.tpUi); // 宿舍（室内场景）要用
+  sc.registry.set('net', sc.net); sc.registry.set('dormUi', sc.dormUi); sc.registry.set('farmUi', sc.farmUi); sc.registry.set('chat', sc.chatUi); sc.registry.set('editProfile', () => sc.editProfile(true)); sc.registry.set('tpUi', sc.tpUi); // 宿舍（室内场景）要用
   sc.battleUi.onOpen = () => closeCat(sc); // 对战开始：收起和小猫互动的小面板
   sc.monUi.onData = () => { refreshCatPanel(sc); sc.backpackUi.refreshTabs(); sc.codexUi?.refresh(); };
   { const prev = sc.net.handlers.monResult; sc.net.handlers.monResult = (ok, msg) => { prev?.(ok, msg); if (sc.catUi?.isOpen) sc.catUi.say(msg, ok); }; }
@@ -377,7 +408,7 @@ export function wireSocial(sc: WorldScene, profile: Profile) {
  */
 export function registerEsc(sc: WorldScene) {
   const reg = (t: EscTarget) => escStack.register(t);
-  for (const p of [sc.profileUi, sc.boardUi, sc.shopUi, sc.wallUi, sc.placeUi, sc.noticeUi, sc.socialUi, sc.backpackUi, sc.boxUi, sc.codexUi, sc.backupUi, sc.questUi, sc.calUi, sc.runUi, sc.partyUi, sc.adminUi, sc.settingsUi, sc.photo, sc.hallUi, sc.tpUi, sc.worldUi, sc.emoteUi, sc.reportUi, sc.dormUi]) reg(p as EscTarget);
+  for (const p of [sc.profileUi, sc.boardUi, sc.shopUi, sc.wallUi, sc.placeUi, sc.noticeUi, sc.socialUi, sc.backpackUi, sc.boxUi, sc.codexUi, sc.backupUi, sc.questUi, sc.calUi, sc.runUi, sc.partyUi, sc.adminUi, sc.settingsUi, sc.photo, sc.hallUi, sc.tpUi, sc.worldUi, sc.emoteUi, sc.reportUi, sc.dormUi, sc.farmUi]) reg(p as EscTarget);
   const hud = sc.hud, adm = sc.adminUi, trade = sc.tradeUi, cat = sc.catUi, card = sc.fishCard;
   reg({ get isOpen() { return lightboxOpen(); }, close: () => { closeLightbox(); } });                      // 留言图片的大图（灯箱）
   reg({ get isOpen() { return hud.mapOpen; }, close: () => { if (hud.mapOpen) hud.toggleMap(); } });         // 大地图

@@ -15,6 +15,9 @@ import { SkinManager, createCharAnims, type CharsMeta } from '@/art/skins';
 
 function allChunks(w: WorldFile) { const o: string[] = []; for (let cy = 0; cy < w.chunk.rows; cy++) for (let cx = 0; cx < w.chunk.cols; cx++) o.push(`${cx}_${cy}`); return o; }
 
+/** generated 里数据文件改过就 +1：换成新 URL，免得浏览器拿缓存里的旧室内数据（碰撞/NPC/出口都在 interiors.json 里） */
+const DATA_V = '20261132';
+
 /** 两段式加载：先拿 world.json 与图集，再按其中的块清单拉地面块。 */
 export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
@@ -31,8 +34,9 @@ export class BootScene extends Phaser.Scene {
     this.load.json('charsMeta', `${G}/chars-meta.json`);
     this.load.atlas('portraits', `${G}/atlas-portraits.webp`, `${G}/atlas-portraits.json`);
     this.load.atlas('held', `${G}/atlas-held.webp`, `${G}/atlas-held.json`);
-    this.load.json('interiors', `${G}/interiors.json`);
+    this.load.json('interiors', `${G}/interiors.json?v=${DATA_V}`);
     this.load.atlas('furniture', `${G}/atlas-furniture.webp`, `${G}/atlas-furniture.json`);
+    this.load.atlas('farmTiles', `${G}/atlas-farm.webp`, `${G}/atlas-farm.json`);   // 农场作物状态图（嫩芽/成熟，透明底）
     this.load.atlas('cats', `${G}/atlas-cats.webp`, `${G}/atlas-cats.json`);
     this.load.json('catsMeta', `${G}/cats-meta.json`);
     this.load.atlas('birds', `${G}/atlas-birds.webp`, `${G}/atlas-birds.json`);   // 精工湖的鸭子和天鹅

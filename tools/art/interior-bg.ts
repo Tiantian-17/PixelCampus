@@ -35,6 +35,7 @@ const THEMES = {
   canteen3: { floor: [hex('#8a6a46'), hex('#a07c52'), hex('#b48e60')], wall: [hex('#d9e6f2'), hex('#bcd0e4'), hex('#9bb4cc')], wain: [hex('#3f5a80'), hex('#587aa6')], plank: true },
   mall: { floor: [hex('#c9ccd2'), hex('#e0e3e8'), hex('#eef0f3')], wall: [hex('#f7f7f4'), hex('#ebebe6'), hex('#d4d4cc')], wain: [hex('#d9822b'), hex('#ee9d42')], plank: false },
   hall: { floor: [hex('#bcb5a0'), hex('#d4cdb8'), hex('#e3dcc8')], wall: [hex('#e3eddc'), hex('#cddcc2'), hex('#aec29e')], wain: [hex('#6a8a58'), hex('#82a56e')], plank: false },
+  farm: { floor: [hex('#6a9a4a'), hex('#7aaa58'), hex('#8aba64')], wall: [hex('#8aba64'), hex('#7aaa58'), hex('#6a9a4a')], wain: [hex('#5a8a3a'), hex('#6a9a4a')], plank: false },
 } as const;
 
 /** 宿舍墙纸 / 地板样式（下标和 src/shared/dormskin.ts 的 WALL_SKINS / FLOOR_SKINS 一一对应；第 0 种 = library 主题原样） */
@@ -64,6 +65,121 @@ export const DORM_FLOOR_STYLES: readonly FloorStyle[] = [
  */
 const isDorm = (id: string) => id === 'dorm' || id === 'dorm-2' || id === 'dorm-3';
 export function paintInterior(s: InteriorSpec, opts: { wall?: number; floor?: number; layer?: 'wall' | 'floor' } = {}): Img {
+  // 农场是户外私人小农场：整张草地（不画墙/窗），左上小木屋 + 栅栏菜园，四周山林环绕，
+  // 中间一块规整耕地（rugs 泥土地块，严格对齐 16px 网格）。地块状态（翻土/作物）由运行时状态层覆盖，
+  // 底图只画「荒地浅泥」，不做歪斜的田。
+  if (s.theme === 'farm') {
+    const img = new Img(s.w * 16, s.h * 16);
+    const W = img.w, H = img.h;
+    const grass = PAL.grass;
+    // 草地：低对比，主要用 1/2/3 阶，稀疏点缀高草和草尖
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const n = vnoise(x, y, 8, 3);
+      let c = n > 0.72 ? grass[2] : n > 0.35 ? grass[1] : grass[0];
+      const h = hash2(x, y, 17);
+      if (h > 0.992) c = grass[3];
+      else if (h > 0.996) c = grass[4];
+      else if (h < 0.003) c = grass[0];
+      img.set(x, y, c);
+    }
+    // 成片小花（黄/白/粉，几朵一簇）
+    for (let i = 0; i < 30; i++) {
+      const cx = Math.floor(hash2(i, 0, 101) * W), cy = Math.floor(hash2(i, 1, 101) * H);
+      const col = hash2(i, 2, 101) < 0.4 ? PAL.grassFlowerY : hash2(i, 3, 101) < 0.5 ? PAL.grassFlowerW : PAL.grassFlowerP;
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+        if (hash2(cx + dx, cy + dy, 5) > 0.6) img.set(cx + dx, cy + dy, col);
+      }
+    }
+    // 山林环绕：顶部整排松柏树冠 + 左右树影 + 底部淡树带（留南侧出口缺口）
+    const pineD = PAL.pine[0], pineM = PAL.pine[1], leafD = PAL.leaf[0], leafM = PAL.leaf[1];
+    const topH = 3 * 16;
+    for (let y = 0; y < topH; y++) for (let x = 0; x < W; x++) {
+      const n = vnoise(x, y, 5, 7);
+      img.set(x, y, n > 0.6 ? pineD : n > 0.3 ? pineM : PAL.pine[2]);
+    }
+    for (let x = 0; x < W; x++) {
+      const depth = 6 + Math.floor(vnoise(x, 0, 18, 5) * 12);
+      for (let y = topH - 4; y < topH - 4 + depth && y < H; y++) img.set(x, y, pineM);
+      if ((x + 9) % 26 < 2) for (let y = topH - 2; y < topH + 6 && y < H; y++) img.set(x, y, pineD);
+    }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (x < 14 && vnoise(x, y, 7, 11) > 0.55) img.set(x, y, leafM);
+      if (x >= W - 14 && vnoise(x, y, 7, 13) > 0.55) img.set(x, y, leafM);
+      if ((x < 9 || x >= W - 9) && vnoise(x, y, 5, 17) > 0.6) img.set(x, y, leafD);
+    }
+    const ex0 = s.exit ? s.exit.x * 16 : 0, ex1 = s.exit ? (s.exit.x + s.exit.w) * 16 : 0;
+    for (let y = H - 8; y < H; y++) for (let x = 0; x < W; x++) {
+      if (x < ex0 - 6 || x >= ex1 + 6) img.set(x, y, y < H - 3 ? leafM : leafD);
+    }
+    // 小木屋（左上角）：木板墙 + 红瓦坡顶
+    const cabinX = 1 * 16, cabinY = 4 * 16, cabinW = 5 * 16, cabinH = 4 * 16;
+    const wood = PAL.wood, woodD = PAL.wood[0];
+    const roof = PAL.roofRed;
+    const roofH = Math.round(1.4 * 16);
+    const roofMidX = cabinX + cabinW / 2;
+    for (let y = 0; y < roofH; y++) {
+      const t = y / roofH;
+      const half = Math.round((cabinW / 2 + 2) * (1 - 0.24 * t));
+      const left = Math.floor(roofMidX - half), right = Math.ceil(roofMidX + half);
+      for (let x = left; x < right; x++) {
+        const row = Math.floor((cabinY - roofH + y) / 4);
+        const c = y === roofH - 1 ? roof[1] : (row % 2 === 0 ? roof[2] : roof[3]);
+        img.set(x, cabinY - roofH + y, c);
+      }
+    }
+    img.hline(Math.floor(roofMidX) - Math.round(cabinW * 0.28), cabinY - roofH, Math.round(cabinW * 0.56), roof[4]);
+    for (let y = cabinY; y < cabinY + cabinH; y++) for (let x = cabinX; x < cabinX + cabinW; x++) {
+      const n = vnoise(x, y, 5, 31);
+      img.set(x, y, (y - cabinY) % 12 === 0 ? woodD : n > 0.6 ? wood[1] : n > 0.3 ? wood[2] : wood[3]);
+      if ((x - cabinX) % 12 === 11) img.set(x, y, woodD);
+    }
+    // 门（朝南，正对耕地）
+    const doorX = cabinX + Math.floor(cabinW / 2) - 12, doorY = cabinY + cabinH - 2 * 16;
+    img.rect(doorX, doorY, 24, 2 * 16, woodD);
+    img.rect(doorX + 3, doorY + 2, 18, 2 * 16 - 2, wood[1]);
+    img.rect(doorX + 3, doorY + 2, 18, 2, wood[2]);
+    img.set(doorX + 17, doorY + 2 * 16 - 14, hex('#e8b92c'));
+    for (const wx of [cabinX + 8, cabinX + cabinW - 24]) {
+      img.rect(wx, cabinY + 8, 16, 14, woodD);
+      img.rect(wx + 2, cabinY + 10, 12, 10, PAL.glass[2]);
+      img.vline(wx + 7, cabinY + 10, 10, PAL.glass[1]);
+      img.hline(wx + 2, cabinY + 14, 12, PAL.glass[1]);
+    }
+    // 木屋脚下的石板台阶 + 小花
+    img.rect(doorX - 2, doorY + 2 * 16, 28, 6, PAL.stone[3]);
+    img.rect(doorX, doorY + 2 * 16, 24, 2, PAL.stone[4]);
+    for (let i = 0; i < 6; i++) {
+      const fx = cabinX + 3 + Math.floor(hash2(i, 0, 41) * (cabinW - 6));
+      const fy = cabinY + cabinH + 8 + Math.floor(hash2(i, 1, 41) * 8);
+      img.set(fx, fy, PAL.grassFlowerY); img.set(fx + 1, fy - 1, PAL.grassFlowerP);
+    }
+    // 栅栏：把私人农场围起来（上方 + 左右，南侧留口通校园）
+    const fence = (x0: number, y0: number, len: number, horiz: boolean) => {
+      for (let i = 0; i < len; i++) {
+        const px = horiz ? x0 + i * 12 : x0, py = horiz ? y0 : y0 + i * 12;
+        img.vline(px, py - 6, 6, PAL.wood[1]);
+        img.hline(px - 2, py - 4, 4, PAL.wood[3]);
+        img.hline(px - 2, py - 1, 4, PAL.wood[2]);
+        img.set(px, py - 7, PAL.wood[3]);
+      }
+    };
+    fence(0, 16, Math.floor(W / 12), true);
+    fence(0, 16, Math.floor((cabinY + cabinH + 24) / 12), false);
+    fence(W - 4, 16, Math.floor((cabinY + cabinH + 24) / 12), false);
+    // 一条从南侧出口通向木屋的小土路（不穿过耕地）
+    const pathX0 = Math.round((ex0 + ex1) / 2) - 12, pathX1 = pathX0 + 24;
+    for (let y = H - 4; y < H; y++) for (let x = pathX0; x < pathX1; x++) img.set(x, y, PAL.dirt[1]);
+    // 耕地（rugs）：规整「翻好土」的泥地，严格按 16px 格对齐；底图只画浅泥，运行时状态层盖成深棕耕土
+    for (const r of s.rugs ?? []) {
+      const x0 = r.x * 16, y0 = r.y * 16, x1 = (r.x + r.w) * 16, y1 = (r.y + r.h) * 16;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const furrow = (y - y0) % 4 === 0;
+        const lump = hash2(x, y, 71) > 0.93;
+        img.set(x, y, furrow ? PAL.dirt[3] : lump ? PAL.dirt[1] : PAL.dirt[2]);
+      }
+    }
+    return img;
+  }
   const base = THEMES[s.theme];
   const ws = DORM_WALL_STYLES[opts.wall ?? 0], fs = DORM_FLOOR_STYLES[opts.floor ?? 0];
   const T = opts.wall === undefined && opts.floor === undefined && !opts.layer ? base : { ...base, wall: ws.wall, wain: ws.wain, floor: fs.floor, plank: fs.plank };

@@ -8,7 +8,7 @@ import { itemDef, type Inv } from '@/shared/items';
 import type { NetClient } from '@/net/client';
 import { itemImg } from './sprites';
 import { decorDef } from '@/shared/decor';
-import { QTY_STEPS, SELL_CHIPS, SHOP_TAB_NAMES, buyMax, clampQty, sellGroup, shopChipsFor, shopItemsFor, type ShopTab } from './shopModel';
+import { QTY_STEPS, SELL_CHIPS, SHOP_TAB_NAMES, buyMax, clampQty, farmSeeds, farmSellList, sellGroup, shopChipsFor, shopItemsFor, type ShopTab } from './shopModel';
 import { commClaimable } from './commissionsView';
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string) => {
@@ -28,10 +28,11 @@ export interface ShopHooks {
 const STALL_SAY = '「钓鱼的人，装备和耐心一样要紧。」';
 
 /**
- * 商店：广场西侧的校园商店 / 精工湖的钓具摊（站在门口按 E 打开）。
- * 校园商店五页：补给 / 钓具 / 家具 / 出售 / 合成；钓具摊三页：买钓具 / 出售 / 合成（委托在「任务」里，摊位顶部有入口按钮）。
+ * 商店：广场西侧的校园商店 / 精工湖的钓具摊 / 农场里的农场管理员（走近按 E 打开）。
+ * 校园商店五页：补给 / 钓具 / 家具 / 出售 / 合成；钓具摊三页：买钓具 / 出售 / 合成（委托在「任务」里，摊位顶部有入口按钮）；
+ * 农场管理员两页：买种子 / 卖菜（只碰作物）。
  * 每页用小号筛选标签分类；列表行紧凑（图标 + 名称 + 价格 + 一个小按钮 = 买 / 卖 1 个），点一行选中后，底部出现全页共用的一条数量条（步进 + ×1 ×5 ×10 最大 + 总价 + 确认）。
- * 货币、价格、行情、限额全在 shared/economy.ts；买卖由服务器结算（它也会检查你是不是真的站在店门口）。这里只显示。
+ * 货币、价格、行情、限额全在 shared/economy.ts；买卖由服务器结算（它也会检查你是不是真的站在店门口 / 农场里）。这里只显示。
  */
 export class ShopPanel {
   private root = el('div', 'screen hidden');
@@ -46,8 +47,8 @@ export class ShopPanel {
   private bossEl = el('div', 'shop-boss hidden');
   private bossBtn = el('button', 'btn primary shop-boss-btn', '📋 钓鱼委托');
   private bar = el('div', 'shop-bar hidden');
-  /** shop = 图书馆广场的校园商店；stall = 精工湖的钓具摊（只卖钓鱼用品；收鱼 / 收杂物和主商店一样） */
-  private mode: 'shop' | 'stall' = 'shop';
+  /** shop = 图书馆广场的校园商店；stall = 精工湖的钓具摊（只卖钓鱼用品；收鱼 / 收杂物和主商店一样）；farm = 农场管理员（只卖种子、只收菜） */
+  private mode: 'shop' | 'stall' | 'farm' = 'shop';
   private tab: Tab = 'sell';
   private chips = new Map<string, string>();
   private sel: Sel | null = null;
@@ -76,10 +77,11 @@ export class ShopPanel {
     fishData.listeners.add(() => { if (this.isOpen) this.render(); });
   }
 
-  /** 页签：校园商店 = 补给 / 钓具 / 家具 / 出售 / 合成；钓具摊 = 买钓具 / 出售 / 合成 */
+  /** 页签：校园商店 = 补给 / 钓具 / 家具 / 出售 / 合成；钓具摊 = 买钓具 / 出售 / 合成；农场管理员 = 买种子 / 卖菜 */
   private tabDefs(): [Tab, string][] {
     return this.mode === 'stall' ? [['gear', '买钓具'], ['sell', '出售'], ['craft', '合成']]
-      : [['supply', SHOP_TAB_NAMES.supply], ['gear', SHOP_TAB_NAMES.gear], ['furn', SHOP_TAB_NAMES.furn], ['sell', '出售'], ['craft', '合成']];
+      : this.mode === 'farm' ? [['supply', '买种子'], ['sell', '卖菜']]
+        : [['supply', SHOP_TAB_NAMES.supply], ['gear', SHOP_TAB_NAMES.gear], ['furn', SHOP_TAB_NAMES.furn], ['sell', '出售'], ['craft', '合成']];
   }
   private buildTabs() {
     const defs = this.tabDefs();
@@ -92,13 +94,17 @@ export class ShopPanel {
   }
 
   get isOpen() { return !this.root.classList.contains('hidden'); }
-  open(mode: 'shop' | 'stall' = 'shop') {
+  open(mode: 'shop' | 'stall' | 'farm' = 'shop') {
     this.mode = mode; this.shownKey = ''; this.sel = null; this.root.classList.remove('hidden'); this.msg.textContent = '';
-    const stall = mode === 'stall';
+    const stall = mode === 'stall', farm = mode === 'farm';
     this.panel.classList.toggle('shop-stall', stall);
-    this.titleEl.textContent = stall ? '钓具摊 · 钓具老板' : '校园商店';
+    this.panel.classList.toggle('shop-farm', farm);
+    this.titleEl.textContent = stall ? '钓具摊 · 钓具老板' : farm ? '农场管理员' : '校园商店';
+    this.subEl.classList.remove('hidden');
     this.subEl.classList.toggle('hidden', stall); this.bossEl.classList.toggle('hidden', !stall);
-    this.subEl.textContent = '钓上来的鱼、翻垃圾桶翻出来的东西都可以出售；赚到的校园币能买鱼饵、猫粮和宿舍家具。';
+    this.subEl.textContent = farm
+      ? '种子不分季节，买回去随时能种；收下来的菜也按固定价卖给他。'
+      : '钓上来的鱼、翻垃圾桶翻出来的东西都可以出售；赚到的校园币能买鱼饵、猫粮和宿舍家具。';
     if (stall) this.buildBoss();
     this.buildTabs(); this.net.getInv(); this.net.getCoins(); this.net.getFx(); if (stall) this.net.getWq(); this.render();
   }
@@ -151,17 +157,18 @@ export class ShopPanel {
 
   // ---------------------------------------------------------------- 买
   private renderBuy(tab: ShopTab) {
-    const stall = this.mode === 'stall', names = shopChipsFor(tab, stall);
+    const stall = this.mode === 'stall', farm = this.mode === 'farm';
+    const names = farm ? [] : shopChipsFor(tab, stall); // 农场只有几包种子，不分小标签
     if (this.chipOf() && !names.includes(this.chipOf())) this.chips.set(`${this.mode}:${this.tab}`, '');
     this.buildChips(names);
     const list = el('div', 'shop-list');
-    for (const s of shopItemsFor(tab, this.chipOf(), stall)) list.append(this.buyRow(s));
+    for (const s of farm ? farmSeeds() : shopItemsFor(tab, this.chipOf(), stall)) list.append(this.buyRow(s));
     const tips: Record<ShopTab, string> = {
       supply: '猫粮每天登录会补到 5 包；猫窝送给校园里的小猫（好感 +20），宿舍里摆的「宿舍猫窝」在「家具」页。',
       gear: '万能饵、指名饵、神话饵、龙骨竿、寒江竿、并蒂竿不在商店卖：要靠合成或钓鱼时的盲盒。配件不消耗，要装在带配件槽的鱼竿上。',
       furn: '宿舍家具买回来，在自己的宿舍里点「装修」摆放；不想要了可以在「出售」页按原价的一半退货。染料装修时给家具上色。',
     };
-    list.append(el('div', 'shop-tip', tips[tab]));
+    list.append(el('div', 'shop-tip', farm ? '一包种子种一块地；种下后每个游戏日浇一次水，成熟了就能收。' : tips[tab]));
     this.body.append(list);
   }
   private buyRow(s: ShopItem) {
@@ -182,18 +189,20 @@ export class ShopPanel {
 
   // ---------------------------------------------------------------- 卖
   private renderSell() {
-    const day = this.day(), bonus = fishData.sellBonus, all = sellList(this.inv, day, bonus);
-    const present = SELL_CHIPS.filter((c) => all.some((r) => sellGroup(r.id) === c));
+    const farm = this.mode === 'farm';
+    const day = this.day(), bonus = fishData.sellBonus;
+    const all = farm ? farmSellList(this.inv, day, bonus) : sellList(this.inv, day, bonus);
+    const present = farm ? [] : SELL_CHIPS.filter((c) => all.some((r) => sellGroup(r.id) === c));
     if (this.chipOf() && !present.includes(this.chipOf() as never)) this.chips.set(`${this.mode}:${this.tab}`, '');
     this.buildChips(present);
-    const cur = this.chipOf(), rows = all.filter((r) => !cur || sellGroup(r.id) === cur);
+    const cur = farm ? '' : this.chipOf(), rows = all.filter((r) => !cur || sellGroup(r.id) === cur);
     const list = el('div', 'shop-list');
-    if (!all.length) list.append(el('div', 'board-empty', '背包里没有东西可以出售。去精工湖边钓几条鱼，或者翻翻校园里的垃圾桶吧！'));
+    if (!all.length) list.append(el('div', 'board-empty', farm ? '背包里没有可以卖的菜。去地里种点东西，熟了再拿来。' : '背包里没有东西可以出售。去精工湖边钓几条鱼，或者翻翻校园里的垃圾桶吧！'));
     for (const r of rows) {
       const row = el('div', 'shop-row' + (this.sel?.kind === 'sell' && this.sel.id === r.id ? ' sel' : '')), info = el('div', 'shop-info');
       const mul = r.rarity === 'junk' || !fishDef(r.id) ? 1 : marketMul(day, r.id), trend = mul >= 1.1 ? '行情好 ↑' : mul <= 0.93 ? '行情差 ↓' : '';
       const name = el('div', 'shop-name', `${r.name} ×${r.n}`); name.style.color = r.rarity === 'common' || r.rarity === 'junk' ? '' : RARITY_COLORS[r.rarity];
-      const sub = el('div', 'shop-note', decorDef(r.id) ? '宿舍家具 · 退货按原价的一半' : isTrashItem(r.id) ? (r.id === TREASURE_ID ? '垃圾桶里翻出来的好东西' : '垃圾桶里翻出来的') : (EXTRA_SELL[r.id] ? '盲盒、河蚌里得到的小东西' : `${RARITY_NAMES[r.rarity]}${trend ? ` · ${trend}` : ''}`));
+      const sub = el('div', 'shop-note', farm ? '作物 · 固定价收购' : decorDef(r.id) ? '宿舍家具 · 退货按原价的一半' : isTrashItem(r.id) ? (r.id === TREASURE_ID ? '垃圾桶里翻出来的好东西' : '垃圾桶里翻出来的') : (EXTRA_SELL[r.id] ? '盲盒、河蚌里得到的小东西' : `${RARITY_NAMES[r.rarity]}${trend ? ` · ${trend}` : ''}`));
       info.append(name, sub);
       const price = el('div', 'shop-price'); price.append(el('span', 'coin-ico'), document.createTextNode(`${r.price}`));
       const b = el('button', 'btn sm primary', '出售'); b.type = 'button';
@@ -201,6 +210,11 @@ export class ShopPanel {
       row.addEventListener('click', () => this.select({ kind: 'sell', id: r.id }));
       row.append(this.icon(r.id), info, price, b);
       list.append(row);
+    }
+    if (farm) {
+      list.append(el('div', 'shop-tip', '作物按固定价收，没有行情；鱼和杂物去图书馆广场的校园商店卖。'));
+      this.body.append(list);
+      return;
     }
     const bulk = el('button', 'btn sm shop-bulk', '一键出售：杂物 + 常见 / 少见的鱼'); bulk.type = 'button';
     bulk.disabled = !all.some((r) => (BULK_RARITIES as readonly string[]).includes(r.rarity));

@@ -7,6 +7,7 @@
 import { FISH } from './fishing';
 import { BAITS, RODS, TACKLES } from './gear';
 import { DECOR } from './decor';
+import { CROPS } from './farming';
 
 /** 可堆叠物品在背包里一格最多放多少（2026-11-06 起 999；鱼竿、配件等 stack 1 的不变） */
 export const STACK_MAX = 999;
@@ -85,7 +86,14 @@ const FISH2_ITEMS: ItemDef[] = [
 ];
 /** 宿舍家具：每件家具是一种背包物品（摆上去从背包扣一个，收回来还一个；目录在 decor.ts） */
 const DECOR_ITEMS: ItemDef[] = DECOR.map((d): ItemDef => ({ id: d.id, name: d.name, desc: d.starter ? `${d.note}（固有家具：每人一份，不能交易、不能卖；在宿舍里点「装修」可以收回、再摆）` : `${d.note}（${d.cat}${d.kind === 'wall' ? '，挂在北墙上' : d.kind === 'top' ? '，摆在桌面上' : d.kind === 'rug' ? '，铺在地上' : d.kind === 'mat' ? '，铺在地上、可以叠在地毯上' : ''}）在宿舍里点「装修」摆放，校园商店有售。`, kind: 'decor', stack: d.starter ? 1 : STACK_MAX }));
-export const ITEMS: readonly ItemDef[] = [...BASE_ITEMS, ...FISH2_ITEMS, ...DECOR_ITEMS];
+/** 耕作：作物与种子的说明取自 farming.ts 的作物表（只写一份） */
+const FARM_ITEMS: ItemDef[] = CROPS.flatMap((c): ItemDef[] => {
+  return [
+    { id: c.id, name: c.name, desc: `${c.blurb}在校园农场（传送面板）种，${c.days} 个游戏日成熟，一块地收 ${c.yield} 个；一个卖 ${c.price} 校园币。`, kind: 'food', stack: STACK_MAX },
+    { id: c.seed, name: `${c.name}种子`, desc: `${c.name}的种子：${c.days} 个游戏日成熟（每天要浇一次水，四季都能种）。在校园农场的空地上播种，${c.seedPrice} 校园币一包。`, kind: 'tool', stack: STACK_MAX },
+  ];
+});
+export const ITEMS: readonly ItemDef[] = [...BASE_ITEMS, ...FISH2_ITEMS, ...DECOR_ITEMS, ...FARM_ITEMS];
 
 export type ItemId = string;
 export type Inv = Record<string, number>;

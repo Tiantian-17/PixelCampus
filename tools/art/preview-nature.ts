@@ -20,6 +20,7 @@ const put = (s: N.Sprite) => { sheet.blit(s.img, x, 150 - s.ay + 20 > 0 ? 170 - 
 [1, 2].forEach((i) => put(N.blossom(i)));
 [1, 2].forEach((i) => put(N.pine(i, i === 2)));
 put(N.willow(3));
+put(N.hollowTree());
 [1, 2, 3].forEach((i) => put(N.bush(i)));
 ['pink', 'yellow', 'white', 'mix'].forEach((k, i) => put(N.flowers(i + 1, k as any)));
 await sheet.savePreview(join(CACHE, 'preview', 'nature.png'), 3);

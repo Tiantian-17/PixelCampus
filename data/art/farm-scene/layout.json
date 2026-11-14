@@ -1,0 +1,19 @@
+{
+ "tile": 16,
+ "cols": 30,
+ "rows": 20,
+ "atlas": "farm-tiles",
+ "plots": [
+  { "x": 11.5, "y": 5.5, "w": 2, "h": 2 }, { "x": 14, "y": 5.5, "w": 2, "h": 2 }, { "x": 16.5, "y": 5.5, "w": 2, "h": 2 }, { "x": 19, "y": 5.5, "w": 2, "h": 2 },
+  { "x": 11.5, "y": 8, "w": 2, "h": 2 }, { "x": 14, "y": 8, "w": 2, "h": 2 }, { "x": 16.5, "y": 8, "w": 2, "h": 2 }, { "x": 19, "y": 8, "w": 2, "h": 2 },
+  { "x": 11.5, "y": 10.5, "w": 2, "h": 2 }, { "x": 14, "y": 10.5, "w": 2, "h": 2 }, { "x": 16.5, "y": 10.5, "w": 2, "h": 2 }, { "x": 19, "y": 10.5, "w": 2, "h": 2 },
+  { "x": 11.5, "y": 13, "w": 2, "h": 2 }, { "x": 14, "y": 13, "w": 2, "h": 2 }, { "x": 16.5, "y": 13, "w": 2, "h": 2 }, { "x": 19, "y": 13, "w": 2, "h": 2 }
+ ],
+ "states": {
+  "grass": "state_grass",
+  "tilled": ["state_tilled", "state_tilled_b", "state_tilled_c"],
+  "sprout": ["state_sprout0", "state_sprout1", "state_sprout2", "state_sprout3"],
+  "maturePrefix": "state_mature_"
+ },
+ "_doc": "参考数据（不被脚本读取，运行时以 src/shared/farming.ts 的 FARM_PLOTS 为准）：16 块 2×2 耕地、4 列 × 4 行；states 对应 data/art/farm-scene/states/ 里的 16 张状态图（草地 / 3 张翻好的土 / 4 阶段嫩芽 / 8 种成熟作物），由 tools/art/farm-tiles.ts 打包成 atlas-farm。枯萎状态已删除。"
+}

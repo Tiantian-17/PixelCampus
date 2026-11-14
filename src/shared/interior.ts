@@ -5,15 +5,17 @@
 export const INTERIOR_THEMES: { k: string; name: string }[] = [
   { k: 'office', name: '办公室/活动室（白墙、大地砖）' }, { k: 'classroom', name: '教室' }, { k: 'library', name: '图书馆（木地板）' }, { k: 'canteen', name: '食堂（米黄墙、红墙裙）' },
   { k: 'canteen2', name: '食堂 B（薄荷绿墙、水磨石地面）' }, { k: 'canteen3', name: '食堂 C（浅蓝墙、木地板）' }, { k: 'mall', name: '超市（白墙、浅色地砖）' }, { k: 'hall', name: '教学楼走廊 / 门厅（浅绿墙）' },
+  { k: 'farm', name: '私人农场（草地、木屋、耕地，户外无墙）' },
 ];
-export type InteriorTheme = 'library' | 'classroom' | 'canteen' | 'office' | 'canteen2' | 'canteen3' | 'mall' | 'hall';
+export type InteriorTheme = 'library' | 'classroom' | 'canteen' | 'office' | 'canteen2' | 'canteen3' | 'mall' | 'hall' | 'farm';
 export interface InteriorWindow { x: number; w: number; curtain?: boolean }
 export interface InteriorLabel { text: string; x: number; y: number; size?: number; color?: string }
 export type Rot = 0 | 90 | 180 | 270;
 export interface InteriorFurn { k: string; x: number; y: number; /** 顺时针旋转角度（缺省 0）；90/270 时占地的宽高互换 */ rot?: Rot; /** 横幅/字画/白板上的字（由 Phaser 文字牌画在家具上） */ text?: string; /** 走近按 E 弹出的话（互动）；标题用家具上的字或家具名 */ interact?: string; /** 宿舍专用的动作：床（睡觉）、空调（开关/制冷/制热）、衣柜（换装）、宝箱（仓库）；走近按 E 触发，由宿舍场景处理 */ act?: 'bed' | 'ac' | 'wardrobe' | 'chest' | 'sign' | 'bath'; /** 摆在桌面上的小件：不占地、画在桌子上面 */ top?: boolean; /** top 小件的层级抬高（像素），缺省 24 */ dz?: number }
 /** 房间内的玻璃隔断（竖向，一格厚）：x 列、y0~y1 行（含两端），gap = 隔断上留的"内部门"（从第 y 行起、高 h 格） */
 export interface InteriorPartition { x: number; y0: number; y1: number; gap?: { y: number; h: number } }
-export interface InteriorNpc { look: number; x: number; y: number; name: string; facing?: 'down' | 'up' | 'left' | 'right'; lines: string[] }
+/** shop = 走近按 E 打开哪个商店（目前只有农场的「农场管理员」：买种子 / 卖菜）；有商店的 NPC 不再弹普通对话框 */
+export interface InteriorNpc { look: number; x: number; y: number; name: string; facing?: 'down' | 'up' | 'left' | 'right'; lines: string[]; shop?: 'farm' }
 /**
  * 楼梯口：画在地板上的一块 w×2 格的楼梯（不挡路），走到上面按 E 换层。dir = 上楼 / 下楼，to = 目标室内 id。
  * land = 从别的楼层走过来时人落在哪（缺省：楼梯口正南面，见 stairLand）。
@@ -44,6 +46,8 @@ export interface InteriorSpec {
   wallW?: 'glass';
   partitions?: InteriorPartition[];
   labels?: InteriorLabel[];
+  /** 额外的挡路块（格）：底图上画死的东西（农场的木屋、树丛），没有家具可挂就写在这里 */
+  blocks?: { x: number; y: number; w: number; h: number }[];
   open?: boolean;
   furniture: InteriorFurn[];
   npcs?: InteriorNpc[];
@@ -123,6 +127,7 @@ export function validateInterior(j: unknown, known: ReadonlySet<string>): string
     if (!Array.isArray(s.npcs) || s.npcs.length > 12) err.push('npcs 不合法');
     else s.npcs.forEach((n, i) => {
       if (!int(n.look) || n.look < 0 || n.look > 20 || !num(n.x) || !num(n.y) || typeof n.name !== 'string' || !n.name || n.name.length > 12 || !Array.isArray(n.lines) || !n.lines.length || n.lines.length > 8 || n.lines.some((l) => typeof l !== 'string' || !l || l.length > 120)) err.push(`npcs[${i}]: 不合法（名字 ≤12 字，台词 1~8 句、每句 ≤120 字）`);
+      else if (n.shop !== undefined && n.shop !== 'farm') err.push(`npcs[${i}]: shop 只能是 farm`);
     });
   }
   if (s.partitions !== undefined) {
@@ -158,7 +163,7 @@ export function seatsOfFurn(f: Pick<InteriorFurn, 'k' | 'x' | 'y' | 'top'>, fw: 
   return out;
 }
 
-/** 碰撞格（'1' = 挡路）：北墙 3 格、东西南墙各 1 格（南墙门洞除外）、玻璃隔断（门洞除外）、地面家具的占地。foot(k,rot) = 家具旋转后的占地格数 */
+/** 碰撞格（'1' = 挡路）：北墙 3 格、东西南墙各 1 格（南墙门洞除外）、玻璃隔断（门洞除外）、地面家具的占地、数据里写死的挡块（blocks）。foot(k,rot) = 家具旋转后的占地格数 */
 export function collisionRows(s: InteriorSpec, foot: (k: string, rot: number) => { fw: number; fh: number } | undefined): string[] {
   const rows: Uint8Array[] = Array.from({ length: s.h }, () => new Uint8Array(s.w));
   for (let y = 0; y < s.h; y++) for (let x = 0; x < s.w; x++) {
@@ -172,6 +177,7 @@ export function collisionRows(s: InteriorSpec, foot: (k: string, rot: number) =>
     const ft = foot(f.k, f.rot ?? 0); if (!ft) continue;
     for (let j = 0; j < ft.fh; j++) for (let i = 0; i < ft.fw; i++) if (rows[f.y + j]?.[f.x + i] !== undefined) rows[f.y + j][f.x + i] = 1;
   }
+  for (const b of s.blocks ?? []) for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) if (rows[b.y + j]?.[b.x + i] !== undefined) rows[b.y + j][b.x + i] = 1;
   return rows.map((r) => Array.from(r).join(''));
 }
 

@@ -22,8 +22,12 @@ export class TeleportPanel {
 
   /** 点了某一层：等服务器说「传到了」之后，通知场景进入这一层 */
   private pendingFloor: string | null = null;
+  /** 刚点了哪个地点（onGone 要用它判断"是不是传到了校园农场"） */
+  private pendingId: string | null = null;
+  /** 这次去农场是不是从大树洞钻的（onGone 要换树洞版的进场特效和横幅） */
+  private viaTree = false;
 
-  constructor(private net: NetClient, private onGone: (floor?: string) => void = () => {}) {
+  constructor(private net: NetClient, private onGone: (floor?: string, id?: string, viaTree?: boolean) => void = () => {}) {
     const panel = el('div', 'box tp');
     const head = el('div', 'board-head');
     const close = el('button', 'btn', '✕'); close.type = 'button'; close.setAttribute('aria-label', '关闭传送面板');
@@ -52,13 +56,18 @@ export class TeleportPanel {
     ui.add({ id: 'teleport', label: '传送', key: 'Y', run: () => this.toggle() });
     net.handlers.tpResult = (ok, msg) => {
       this.say(msg, ok);
-      if (ok) { const fl = this.pendingFloor ?? undefined; this.pendingFloor = null; this.lastGo = Date.now(); this.close(); this.onGone(fl); } else this.pendingFloor = null;
+      if (ok) { const fl = this.pendingFloor ?? undefined, id = this.pendingId ?? undefined, tree = this.viaTree; this.pendingFloor = null; this.pendingId = null; this.viaTree = false; this.lastGo = Date.now(); this.close(); this.onGone(fl, id, tree); } else { this.pendingFloor = null; this.pendingId = null; this.viaTree = false; }
     };
   }
 
-  private go(id: string, floor: string | null) {
+  /** 菜单「农场」：不用先开面板，直接传送到农场（成功后由场景淡出进入私人农场空间）；fromTree = 从大树洞钻的，换树洞版特效 */
+  goFarm(fromTree = false) { this.go('farm', null, fromTree); }
+
+  private go(id: string, floor: string | null, viaTree = false) {
     if (this.net.status !== 'online') { this.say('没连上服务器，不能传送', false); return; }
-    this.lastGo = Date.now(); this.pendingFloor = floor; this.net.tpGo(id);
+    // 树洞标记每次都由调用方给：离线 / 被拒时不留下残留，否则下次从面板正常传农场会误用「🌳 大树洞」的横幅和黑屏特效
+    this.viaTree = viaTree && id === 'farm';
+    this.lastGo = Date.now(); this.pendingFloor = floor; this.pendingId = id; this.net.tpGo(id);
   }
   get isOpen() { return !this.root.classList.contains('hidden'); }
   open() { this.say('', true); this.root.classList.remove('hidden'); }

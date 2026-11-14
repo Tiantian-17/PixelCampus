@@ -104,7 +104,18 @@ export function runAct(sc: WorldScene, a: Act) {
     case 'dorm_enter': sc.net.dormEnter(); break;
     case 'enter_interior': enterInterior(sc, a.ref as BuildingOut); break;
     case 'dialog': sc.hud.openDialog(a.title, a.text); break;
-    case 'panel': if (a.which === 'board') sc.boardUi.open(); else if (a.which === 'shop') sc.shopUi.open(); else if (a.which === 'fishshop') sc.shopUi.open('stall'); else sc.wallUi.open(); break;
+    case 'panel': if (a.which === 'board') sc.boardUi.open(); else if (a.which === 'shop') sc.shopUi.open(); else if (a.which === 'fishshop') sc.shopUi.open('stall'); else if (a.which === 'portal') { /* 大树洞是彩蛋：按 E 直接回我的农场（菜单传送里不列它）；第一次钻先放一小段剧情 */
+      let seen = true; try { seen = !!localStorage.getItem('pixelcampus.farmTreeStory'); } catch { /* 存储不可用就当看过了，直接进 */ }
+      if (seen) sc.tpUi.goFarm(true);
+      else {
+        try { localStorage.setItem('pixelcampus.farmTreeStory', '1'); } catch { /* 忽略 */ }
+        sc.hud.openDialog('大树洞', [
+          '（这棵老树你路过很多次了，今天却头一回停下脚步——树洞里好像有点不一样。）',
+          '（洞里深得看不见底，浮着一层薄薄的暖光。风是从里面吹出来的，带着泥土和青草的味道，还有一点……庄稼的气息？）',
+          '（钻进去看看吧。）',
+        ], () => sc.tpUi.goFarm(true)); // 翻完（或 Esc 跳过）才真正传送：剧情引出「树洞通向异世界农场」；true = 树洞版进场特效（暗 → 黑一拍 → 暖光亮起）
+      }
+    } else sc.wallUi.open(); break;
     case 'egg': {
       const egg = a.ref as NonNullable<WorldScene['wf']['interacts']>[number];
       const st = sc.egg.get(egg.id) ?? sc.egg.set(egg.id, { step: 0 }).get(egg.id)!;

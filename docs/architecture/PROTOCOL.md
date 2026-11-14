@@ -1,7 +1,7 @@
 <!-- 本文件由 npm run protocol:doc 根据 src/shared/protocol.ts 生成，不要手改（改了协议后重新生成） -->
 # 联机协议索引
 
-> 共 155 种客户端消息、124 种服务器消息（另有位置上报 / 快照两种二进制帧，见 protocol.ts 的 encodePos / decodeSnapshot）。
+> 共 157 种客户端消息、126 种服务器消息（另有位置上报 / 快照两种二进制帧，见 protocol.ts 的 encodePos / decodeSnapshot）。
 > 字段定义以 [`src/shared/protocol.ts`](../../src/shared/protocol.ts) 为准；规则细节在 `src/shared/` 对应文件；每批功能的设计背景见 [MULTIPLAYER.md](../design/MULTIPLAYER.md) 与 [CHANGELOG.md](../CHANGELOG.md)。
 > 新增消息：在 protocol.ts 的联合类型里加一行并写注释 → `npm run protocol:doc` → 服务端在对应 handler 里登记。
 
@@ -232,10 +232,12 @@
 |---|---|---|
 | `hall_get` | → 服务器 | — |
 
-## 其他（12）
+## 其他（16）
 
 | 消息 | 方向 | 说明 |
 |---|---|---|
+| `farm_get` | → 服务器 | 校园农场：看自己的田（省略 uid）/ 看好友的田；操作一块地（uid 省略 = 自己的） |
+| `farm_op` | → 服务器 | — |
 | `trainer_battle` | → 服务器 | 和训练家 NPC 切磋：id 见 shared/trainers.ts |
 | `spawn` | → 客户端 | ttl = 这个玩家佩戴的称号 id（服务器认定的，没戴就没有这个字段） |
 | `despawn` | → 客户端 | — |
@@ -244,6 +246,8 @@
 | `notices` | → 客户端 | 公告列表（新的在前）。newId 只在"刚发布了新公告"时带上：在线的玩家据此提示，而不是每次改动都弹窗 |
 | `release_result` | → 客户端 | — |
 | `time` | → 客户端 | 服务器当前时间（毫秒时间戳）：进来时发一次，之后每 30 秒一次；客户端据此校准游戏时钟，让全服时间一致 |
+| `farm` | → 客户端 | 校园农场：一整份田的状态（今天还能偷几次、最近 20 条被偷记录）。浇水不花钱、不限次数，所以没有次数统计。 mine = 是不是自己的田；今天的游戏日由服务器给（客户端不用自己算，避免设备时钟偏差）。 |
+| `farm_result` | → 客户端 | — |
 | `locs` | → 客户端 | 在线好友的大致位置（按我的视角算好）；hidden = 我是否对好友隐藏了自己的位置 |
 | `quests` | → 客户端 | 今天的任务进度；full = 累计做完全部任务的天数；fresh = 这次刚完成的任务（客户端据此弹提示） |
 | `titles` | → 客户端 | 我的称号：已获得（称号 id → 时间）与正在佩戴的；new = 这次刚得到的（客户端据此弹提示） |

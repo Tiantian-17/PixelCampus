@@ -8,6 +8,7 @@ import { TACKLES } from './gear';
 import { itemDef } from './items';
 import { DECOR, decorRefund } from './decor';
 import { TREASURE_ID, TRASH_ONLY, trashPrice } from './trash';
+import { CROPS } from './farming';
 
 /** 日期编号：东八区的"第几天"，换日以北京时间 0 点为界（和服务器 progress.dayNo 一致） */
 export const marketDay = (now: number) => Math.floor((now + 8 * 3600e3) / 86400e3);
@@ -33,9 +34,12 @@ export function marketMul(day: number, id: string): number {
 }
 /** 盲盒里开出来的小东西：珍珠和校园小宝物也能卖（没有行情，固定价） */
 export const EXTRA_SELL: Readonly<Record<string, number>> = { pearl: 120, relic_badge: 60, relic_card: 45, relic_meal: 30, relic_history: 90 };
+/** 作物收购价：固定价、没有行情（价目写在 farming.ts 的作物表里，避免两处维护） */
+export const CROP_SELL: Readonly<Record<string, number>> = Object.fromEntries(CROPS.map((c) => [c.id, c.price]));
 /** 今天卖一条这个物品能得多少币；不收的东西返回 0 */
 export function sellPrice(id: string, day: number, bonus = 0): number {
   if (EXTRA_SELL[id]) return EXTRA_SELL[id];
+  if (CROP_SELL[id]) return CROP_SELL[id]; // 作物：固定价，不吃行情和钓鱼加成
   { const r = decorRefund(id); if (r) return r; } // 宿舍家具：商店按原价的一半收回（没有行情、没有加成）
   const tp = trashPrice(id); // 翻垃圾桶翻出来的东西：垃圾 1 币、U 盘 999 币，没有行情
   if (tp) return tp;
@@ -92,18 +96,21 @@ export const SHOP: readonly ShopItem[] = [
   { id: 'rod_golden', n: 1, price: 1800, note: '金龙鱼竿：拉鱼大幅放宽、咬钩最快、稀有鱼显著增多' },
   ...TACKLES.map((t) => ({ id: t.id, n: 1, price: t.price, note: `${t.eff}（配件，不消耗；要有带配件槽的鱼竿才能装）` })),
   ...DECOR.filter((d) => d.price > 0).map((d) => ({ id: d.id, n: 1, price: d.price, note: d.note })), // 宿舍家具（图书馆广场的校园商店卖）
+  // 作物种子（校园农场）：一包 1 颗，种下一块地
+  ...CROPS.map((c) => ({ id: c.seed, n: 1, price: c.seedPrice, note: `${c.name}种子：四季都能种，${c.days} 个游戏日成熟，一块地收 ${c.yield} 个（${c.price} 币/个）` })),
 ];
 const SHOP_BY_ID = new Map(SHOP.map((s) => [s.id, s]));
 export const shopItem = (id: unknown): ShopItem | undefined => (typeof id === 'string' ? SHOP_BY_ID.get(id) : undefined);
 /** 猫窝送给一只猫时涨的好感 */
 export const CAT_BED_GAIN = 20;
 
-/** 该件东西在背包里能不能卖（收鱼、杂物，和翻垃圾桶翻出来的东西） */
-export const sellable = (id: string): boolean => !!fishDef(id) || trashPrice(id) > 0 || (EXTRA_SELL[id] ?? 0) > 0 || decorRefund(id) > 0;
-/** 一键卖出收的东西：杂物、常见、少见的鱼，和翻出来的垃圾（U 盘舍不得，要卖手动点） */
-export const bulkSellable = (id: string): boolean => { const d = fishDef(id); return d ? BULK_RARITIES.includes(d.rarity) : TRASH_ONLY.includes(id); };
+/** 该件东西在背包里能不能卖（收鱼、作物、杂物，和翻垃圾桶翻出来的东西） */
+export const sellable = (id: string): boolean => !!fishDef(id) || !!CROP_SELL[id] || trashPrice(id) > 0 || (EXTRA_SELL[id] ?? 0) > 0 || decorRefund(id) > 0;
+/** 一键卖出收的东西：作物、杂物、常见、少见的鱼，和翻出来的垃圾（U 盘舍不得，要卖手动点） */
+export const bulkSellable = (id: string): boolean => { if (CROP_SELL[id]) return true; const d = fishDef(id); return d ? BULK_RARITIES.includes(d.rarity) : TRASH_ONLY.includes(id); };
 export function sellList(inv: Record<string, number>, day: number, bonus = 0): { id: string; name: string; n: number; price: number; rarity: Rarity }[] {
   const out: { id: string; name: string; n: number; price: number; rarity: Rarity }[] = FISH.filter((f) => (inv[f.id] ?? 0) > 0).map((f) => ({ id: f.id, name: f.name, n: inv[f.id], price: sellPrice(f.id, day, bonus), rarity: f.rarity }));
+  for (const c of CROPS) if ((inv[c.id] ?? 0) > 0) out.push({ id: c.id, name: c.name, n: inv[c.id], price: c.price, rarity: 'common' }); // 作物：固定价
   for (const id of [...Object.keys(EXTRA_SELL), ...TRASH_ONLY, TREASURE_ID]) if ((inv[id] ?? 0) > 0) out.push({ id, name: itemDef(id)?.name ?? id, n: inv[id], price: sellPrice(id, day), rarity: id === TREASURE_ID || EXTRA_SELL[id] ? 'rare' : 'junk' });
   for (const d of DECOR) if ((inv[d.id] ?? 0) > 0 && decorRefund(d.id) > 0) out.push({ id: d.id, name: d.name, n: inv[d.id], price: decorRefund(d.id), rarity: 'rare' }); // 宿舍家具：退货（原价的一半）
   return out;

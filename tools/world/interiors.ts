@@ -9,6 +9,8 @@ import { OFFICE_FURNITURE, FURN_INFO, FURN_TEXT } from '../art/furniture-office.
 import { DORM_FURNITURE, DORM_INFO } from '../art/furniture-dorm.ts';
 import { Img } from '../art/px.ts';
 import { paintInterior, DORM_WALL_STYLES, DORM_FLOOR_STYLES, type InteriorSpec } from '../art/interior-bg.ts';
+import { buildFarmAtlas } from '../art/farm-tiles.ts';
+import { buildFarmBg } from '../art/farm-bg.ts';
 import { skinFile } from '../../src/shared/dormskin.ts';
 import { dormInteriorLevel, isDormInterior } from '../../src/shared/dorm.ts';
 import { pack, type PackItem } from '../art/pack.ts';
@@ -56,11 +58,13 @@ const footOf = (k: string, rot: number) => { const r = foot[k]?.rots[rot]; retur
   const errs = validateInteriorSet(specs).concat(specs.flatMap((s) => interiorProblems(s, footOf).stairs.map((e) => `${s.id}: ${e}`)));
   if (errs.length) throw new Error(`室内数据有问题：\n${errs.slice(0, 12).join('\n')}`);
 }
+await buildFarmAtlas(); // 农场状态图集：data/art/farm-scene/states/ → atlas-farm.* + farm-layout.json
 const byId = new Map(specs.map((s) => [s.id, s]));
 for (const s of specs) {
   const errs = validateInterior(s, new Set(Object.keys(foot)));
   if (errs.length) throw new Error(`室内 ${s.id} 不合法：\n${errs.slice(0, 8).join('\n')}`);
-  const bg = paintInterior(s);
+  // 农场底图直接缩手绘原图（tools/art/farm-bg.ts）；原图缺失时才退回程序化绘制
+  const bg = s.theme === 'farm' ? await buildFarmBg().catch(() => paintInterior(s)) : paintInterior(s);
   await bg.save(join(GEN, `interior-${s.id}.png`));
   if (isDormInterior(s.id)) { // 宿舍：墙纸、地板各烘焙成透明的一层，客户端按玩家选的样式叠起来（用到哪张才加载哪张）
     const lv = dormInteriorLevel(s.id);

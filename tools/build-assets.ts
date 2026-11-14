@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { ROOT } from './paths.ts';
 for (const s of ['tools/art/index.ts', 'tools/world/compile.ts', 'tools/world/interiors.ts', 'tools/mons/build-art.ts', 'tools/mons/cat-art.ts', 'tools/assets/webp.ts']) {
-  const r = spawnSync('npx', ['tsx', s], { cwd: ROOT, stdio: 'inherit' });
-  if (r.status !== 0) process.exit(r.status ?? 1);
+  // Windows 下 npx 是 npx.cmd，不加 shell 会直接 ENOENT（脚本静默退出、一个产物都不生成）；用整条命令字符串避免 shell 拼接告警
+  const r = spawnSync(`npx tsx ${s}`, { cwd: ROOT, stdio: 'inherit', shell: true });
+  if (r.status !== 0) { console.error(`资源生成失败：${s}`); process.exit(r.status ?? 1); }
 }

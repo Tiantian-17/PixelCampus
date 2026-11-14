@@ -20,7 +20,7 @@ export type Act =
   | { t: 'pax_leave' } | { t: 'fish_reel' } | { t: 'fish_cancel' } | { t: 'stand' } | { t: 'dismount' } | { t: 'mount' }
   | { t: 'bird_feed'; id: number } | { t: 'cast' } | { t: 'open_cat'; ref: unknown }
   | { t: 'dorm_enter' } | { t: 'enter_interior'; ref: unknown } | { t: 'dialog'; title: string; text: string | string[] }
-  | { t: 'panel'; which: 'board' | 'shop' | 'fishshop' | 'wall' } | { t: 'egg'; ref: unknown }
+  | { t: 'panel'; which: 'board' | 'shop' | 'fishshop' | 'wall' | 'portal' } | { t: 'egg'; ref: unknown }
   | { t: 'pax_join'; uid: number } | { t: 'bin'; idx: number } | { t: 'sit'; ref: unknown } | { t: 'run_open' } | { t: 'talk'; ref: unknown };
 /** hint：undefined = 这一帧不动提示；null = 清掉提示；string = 显示这句。act 只有按了 E / 空格 / 触屏互动才有 */
 export interface Decision { hint: string | null | undefined; act?: Act }
@@ -74,7 +74,7 @@ export function decideInteraction(i: InteractInput): Decision {
   }
   if (egg) {
     const a = egg.action;
-    return { hint: egg.hint, act: act(a === 'board' || a === 'shop' || a === 'fishshop' || a === 'wall' ? { t: 'panel', which: a } : { t: 'egg', ref: egg.ref }) };
+    return { hint: egg.hint, act: act(a === 'board' || a === 'shop' || a === 'fishshop' || a === 'wall' || a === 'portal' ? { t: 'panel', which: a } : { t: 'egg', ref: egg.ref }) };
   }
   if (i.mateBike) return { hint: `E  坐上 ${i.mateBike.name} 的车后座`, act: act({ t: 'pax_join', uid: i.mateBike.uid }) };
   if (i.mateFar && !cat && !i.bike && !i.seat && !i.fishSpot) return { hint: `${i.mateFar.name} 在骑车：走近他的车，按 E 坐后座` };

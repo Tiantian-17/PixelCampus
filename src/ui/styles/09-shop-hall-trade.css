@@ -16,6 +16,8 @@ body.touch #coin-pill { left: calc(10px + env(safe-area-inset-left)); top: calc(
 .shop-boss-btn { flex: none; padding: 6px 12px; font-size: 14px; font-family: inherit; color: var(--ink); }
 .shop-stall { border-color: #3b7f8f; }
 .shop-stall .board-title { color: #1d5a6a; }
+.shop-farm { border-color: #6f9d4a; }
+.shop-farm .board-title { color: #3f6b26; }
 .shop-tabs { margin: 4px 0; }
 .shop-tabs .cx-tab { flex: 1; min-height: 32px; padding: 3px 4px; font-size: 14px; font-family: inherit; color: var(--ink); text-align: center; }
 .shop-chips { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 4px; }

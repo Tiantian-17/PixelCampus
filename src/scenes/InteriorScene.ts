@@ -28,6 +28,12 @@ import type { EmotePanel } from '@/ui/EmotePanel';
 import { Cat } from '@/entities/Cat';
 import { CAT_REACH, type CatDef } from '@/shared/cats';
 import { bedSpots, dormCatHome, type CatBridge, type DormCatFx } from '@/systems/dormcats';
+import { FARM_INTERIOR, FARM_PLOTS, cropDef, growthText, plotStage } from '@/shared/farming';
+import type { FarmPanel } from '@/ui/FarmPanel';
+import type { ShopPanel } from '@/ui/ShopPanel';
+
+/** 翻好的土有 3 张略有差异的图：按地块散开用，16 块排在一起才不像同一张图盖了 16 次 */
+const TILLED_FRAMES = ['state_tilled', 'state_tilled_b', 'state_tilled_c'] as const;
 
 export interface InteriorDef {
   id: string; name: string; w: number; h: number; bg: string; desc?: string;
@@ -35,7 +41,7 @@ export interface InteriorDef {
   interacts?: { x0: number; x1: number; y0: number; y1: number; title: string; text: string; act?: 'bed' | 'ac' | 'wardrobe' | 'chest' | 'sign' | 'bath' }[];
   collision: string[];
   objects: { k: string; x: number; y: number; depth: number }[];
-  npcs: { look: number; x: number; y: number; name: string; facing?: 'down' | 'up' | 'left' | 'right'; lines: string[] }[];
+  npcs: { look: number; x: number; y: number; name: string; facing?: 'down' | 'up' | 'left' | 'right'; lines: string[]; shop?: 'farm' }[];
   /** 南墙门洞（回校园）；多层建筑的二层以上没有，只能走楼梯 */
   exit?: { x: number; w: number }; spawn: { x: number; y: number };
   floor?: number; building?: string;
@@ -56,6 +62,8 @@ export class InteriorScene extends Phaser.Scene {
   private leaving = false;
   /** 从哪一层走楼梯过来的（落在对应楼梯口旁边）；从校园进来 / 传送进来时没有 */
   private fromId?: string;
+  /** 从大树洞钻进来的：进场淡入换成「从黑暗里慢慢亮起一层暖光」 */
+  private treeArrive = false;
   // ---- 家具摆放（装修）：宿舍里除了床/衣柜/宝箱/浴缸，其余家具都来自摆放数据，客户端按它现画
   private lay: Placed[] = []; private layKey = ''; private decorObjs: Phaser.GameObjects.Image[] = []; private decorTalk: NonNullable<InteriorDef['interacts']> = [];
   private level = 0; private skinNow = { w: -1, f: -1 }; private skinImgs: Phaser.GameObjects.Image[] = []; private skinSeq = 0;
@@ -79,6 +87,17 @@ export class InteriorScene extends Phaser.Scene {
   /** 养在宿舍的小猫（房主养的；房主自己能摸 / 喂 / 抱，访客只能看）：猫编号 → 宿舍里的那只 Cat */
   private dormCats = new Map<number, Cat>(); private catBridge?: CatBridge; private peersBefore: Cat[] = []; private heldCats = new Set<number>(); private catCrouch = false; private catShift = false; private bnd = { x: 0, y: 0, w: 0, h: 0 };
   private sleepWho?: Character; private rt = { t: 0, x: -1, y: -1, f: -1 };
+  // ---- 农场（id === 'farm'）：一块独立空间，每块地分「土壤层」（荒草地 / 翻好的深色土）+「作物层」（嫩芽/成熟）两层按状态换图
+  private farm = false;
+  private farmData: Extract<ServerMsg, { t: 'farm' }> | null = null;
+  private farmCells: Phaser.GameObjects.Image[] = [];
+  private farmCrops: Phaser.GameObjects.Image[] = [];
+  private farmAt: { x: number; y: number; w: number; h: number }[] = [];
+  private prevFarmHandler?: NetClient['handlers']['farm'];
+  /** 刚和商店老板聊完的时间点：4 秒内再按 E 直接开柜台，不然又是重新聊一遍 */
+  private chatUntil = 0;
+  /** 已经播过「农场管理员提醒」了（每次进屋只提醒一次） */
+  private farmTold = false;
   /** 我是不是房主（自己的宿舍） */
   private get isHost() { return !this.visit; }
   /** 手机：摇杆/互动键是校园场景创建的 DOM 控件（共用），这里读它的状态；互动键按下记在 registry 的 touchPress 里 */
@@ -86,7 +105,7 @@ export class InteriorScene extends Phaser.Scene {
   private takeTouchPress() { const p = !!this.registry.get('touchPress'); if (p) this.registry.set('touchPress', false); return p; }
   constructor() { super('Interior'); }
 
-  init(data: { id: string; from?: string }) { this.registry.set('interiorId', data.id); this.fromId = data.from; this.leaving = false; this.sitting = false; this.seats = []; this.layKey = ''; this.lay = []; this.decorObjs = []; this.decorTalk = []; this.skinNow = { w: -1, f: -1 }; this.skinImgs = []; this.skinSeq++; }
+  init(data: { id: string; from?: string; treeArrive?: boolean }) { this.registry.set('interiorId', data.id); this.fromId = data.from; this.treeArrive = data.treeArrive ?? false; this.leaving = false; this.sitting = false; this.seats = []; this.layKey = ''; this.lay = []; this.decorObjs = []; this.decorTalk = []; this.skinNow = { w: -1, f: -1 }; this.skinImgs = []; this.skinSeq++; this.farm = false; this.farmData = null; this.farmCells = []; this.farmCrops = []; this.farmAt = []; this.farmTold = false; }
 
   create() {
     this.hud = this.registry.get('hud') as Hud;
@@ -100,8 +119,8 @@ export class InteriorScene extends Phaser.Scene {
     if (!isDormInterior(d.id)) this.add.image(0, 0, d.bg).setOrigin(0).setDepth(-1); // 宿舍的底图是墙纸 + 地板两层，按玩家选的样式在 setupDorm 里加载
     for (const o of d.objects) this.add.image(o.x, o.y, 'furniture', o.k).setOrigin(0).setDepth(o.depth);
     for (const l of d.labels ?? []) this.add.text(l.x * TILE, l.y * TILE, l.text, { fontFamily: 'ArkPixel', fontSize: `${l.size ?? 10}px`, color: l.color ?? '#2a2a33' }).setOrigin(0.5).setDepth(9000); // 文字牌要压在家具上面（家具的层级 = 它的底边像素，比 5 大得多，之前文字被横幅/字画盖住了）
-    this.npcs = d.npcs.map((n) => new Npc(this, n.x * TILE, n.y * TILE, n.look, n.name, n.lines, false, n.facing ?? 'down'));
-    this.dorm = isDormInterior(d.id); this.level = dormInteriorLevel(d.id);
+    this.npcs = d.npcs.map((n) => new Npc(this, n.x * TILE, n.y * TILE, n.look, n.name, n.lines, d.id === FARM_INTERIOR, n.facing ?? 'down')); // 农场管理员会在田边溜达，其他 NPC 站着不动
+    this.dorm = isDormInterior(d.id); this.level = dormInteriorLevel(d.id); this.farm = d.id === FARM_INTERIOR;
     this.visit = this.dorm ? ((this.registry.get('dormVisit') as Extract<ServerMsg, { t: 'dorm_visit' }> | null | undefined) ?? null) : null;
     const me = this.registry.get('profile') as Profile | undefined; this.seenProfile = me;
     const sp = (this.fromId && d.stairs?.find((t) => t.to === this.fromId)?.land) || d.spawn; // 走楼梯过来：落在通向来处的那个楼梯口旁边
@@ -121,10 +140,12 @@ export class InteriorScene extends Phaser.Scene {
     const K = Phaser.Input.Keyboard.KeyCodes;
     this.keys = this.input.keyboard!.addKeys({ up: K.UP, down: K.DOWN, left: K.LEFT, right: K.RIGHT, w: K.W, a: K.A, s: K.S, d: K.D, shift: K.SHIFT, e: K.E, space: K.SPACE, esc: K.ESC, enter: K.ENTER, y: K.Y, x: K.X }) as any;
     this.registry.set('touchPress', false); // 进门那一下的互动键别算在室内里
-    cam.fadeIn(280, 20, 14, 10);
+    if (this.treeArrive) cam.fadeIn(760, 250, 243, 214); // 树洞钻进来：从全黑里慢慢亮起一层暖光（呼应剧情里「洞里浮着暖光」）——比正常进屋慢，像眼睛适应黑暗
+    else cam.fadeIn(280, 20, 14, 10);
     this.hud.showMinimap(false);
     this.hud.banner(d.name, d.desc ?? '走到南侧门口即可离开');
     if (this.dorm) this.setupDorm();
+    if (this.farm) this.setupFarm();
   }
 
   // ------------------------------------------------------------ 宿舍
@@ -198,6 +219,86 @@ export class InteriorScene extends Phaser.Scene {
       safe(() => { if (this.net) this.net.handlers.dormLikes = this.prevLikes; });
     });
   }
+  // ------------------------------------------------------------ 农场
+  /** 农场：16 块地（4×4 格子）由状态 tile 盖出来——每块地一层土壤 32×32（草地/深色土）+ 一层作物 32×40（向上长），向服务器要自己的田 */
+  private setupFarm() {
+    this.net = this.registry.get('net') as NetClient | undefined;
+    this.farmAt = FARM_PLOTS.map((p) => ({ x: p.x * TILE, y: p.y * TILE, w: p.w * TILE, h: p.h * TILE }));
+    for (const a of this.farmAt) {
+      const cx = a.x + a.w / 2, cy = a.y + a.h / 2;
+      const soil = this.add.image(cx, cy, 'farmTiles', 'state_grass');
+      soil.setDepth(-0.5); // 土壤是地面装饰，永远压在底图之上、所有人和作物之下：走到地里不会被人被土块盖掉
+      this.farmCells.push(soil);
+      const crop = this.add.image(cx, a.y + a.h - 20, 'farmTiles', 'state_sprout0').setAlpha(0); // 作物图 32×40：底边贴地块底边，只向上占用格子间的空隙
+      crop.setDepth(a.y + a.h + 0.2); // 作物层盖在土上；层级按地块底边：站在地块南侧时人画在作物前面
+      this.farmCrops.push(crop);
+    }
+    for (const n of this.npcs) n.box = { x0: 168, y0: 226, x1: 356, y1: 300 }; // 管理员在田南侧的田埂上溜达，不走进田里 / 墙里
+    if (this.net) {
+      const h = this.net.handlers;
+      this.prevFarmHandler = h.farm;
+      h.farm = (m) => { this.prevFarmHandler?.(m); this.applyFarm(m); }; // 面板也要这份数据：串在它前面
+      this.events.once('shutdown', () => { if (this.net) this.net.handlers.farm = this.prevFarmHandler; });
+      this.net.getFarm();
+    }
+  }
+  /** 服务器下发的农场数据 → 每块地盖什么：土壤层（翻过=深色土，没翻=草地），作物层（嫩芽 4 阶段 → 成熟；今天浇过水偏冷色） */
+  private applyFarm(m: Extract<ServerMsg, { t: 'farm' }>) {
+    if (!m.mine) return; // 农场里只画自己的地（看好友的田在面板「访客」页）
+    this.farmData = m;
+    FARM_PLOTS.forEach((p, slot) => {
+      const soil = this.farmCells[slot], crop = this.farmCrops[slot];
+      if (!soil || !crop) return;
+      const plot = m.plots[slot];
+      const def = cropDef(plot.c);
+      const stage = plotStage(plot, m.today);
+      // 土壤层：种着东西或翻过 = 深色土（3 张图按地块散开用）；荒地 = 草地
+      soil.setFrame(plot.c || plot.t ? TILLED_FRAMES[(slot * 2 + Math.floor(slot / 4)) % TILLED_FRAMES.length] : 'state_grass').setAlpha(1);
+      if (!plot.c) { crop.setAlpha(0); return; } // 空地没有作物层
+      const frame = stage === 'ripe'
+        ? `state_mature_${plot.c.replace(/^crop_/, '')}`
+        : `state_sprout${Math.min(3, Math.floor((plot.w / Math.max(1, def!.days)) * 4))}`;
+      crop.setFrame(frame).setAlpha(1).setTint(plot.wd === m.today ? 0xbfe6ff : 0xffffff);
+    });
+    if (!this.farmTold) { // 进屋第一次拿到田里的数据：管理员先把「该浇水 / 该收了」说一遍
+      this.farmTold = true;
+      const advice = this.farmAdvice();
+      if (advice) this.hud.banner('农场管理员', advice);
+    }
+  }
+  /** 农场管理员的一句提醒：几块地能收、几块等着浇水、几块还没翻（都没事就返回空串） */
+  private farmAdvice(): string {
+    const m = this.farmData;
+    if (!m) return '';
+    let ripe = 0, thirsty = 0, wild = 0;
+    for (const p of m.plots) {
+      const st = plotStage(p, m.today);
+      if (st === 'ripe') ripe++;
+      else if (st === 'growing') { if (p.wd !== m.today) thirsty++; }
+      else if (!p.t) wild++;
+    }
+    return [
+      ripe ? `${ripe} 块地能收了` : '',
+      thirsty ? `${thirsty} 块地还等着浇水` : '',
+      wild ? `${wild} 块荒地没翻` : '',
+    ].filter(Boolean).join('，');
+  }
+  /** 站在哪块地边上（地块外扩 10px = 贴着地边也能按 E；相邻地块的判定区会重叠，取中心最近的那块） */
+  private farmPlotAt(): number {
+    let best = -1, bd = Infinity;
+    for (let i = 0; i < this.farmAt.length; i++) {
+      const a = this.farmAt[i];
+      if (this.player.x < a.x - 10 || this.player.x > a.x + a.w + 10 || this.player.y < a.y - 10 || this.player.y > a.y + a.h + 10) continue;
+      const dd = Math.hypot(a.x + a.w / 2 - this.player.x, a.y + a.h / 2 - this.player.y);
+      if (dd < bd) { bd = dd; best = i; }
+    }
+    return best;
+  }
+  private farmUi() { return this.registry.get('farmUi') as FarmPanel | undefined; }
+  private shopUi() { return this.registry.get('shopUi') as ShopPanel | undefined; }
+  /** 这个 NPC 是不是商店老板（数据里带 shop 字段）：是的话按 E 直接开商店，不弹普通对话框 */
+  private npcShop(n: Npc) { return this.def.npcs[this.npcs.indexOf(n)]?.shop; }
+
   // ---- 宿舍里养的猫
   /** 让宿舍里的猫和 ids 一致：多出来的（送回校园了）去掉，新来的画出来 */
   private syncDormCats(ids: readonly number[]) {
@@ -527,10 +628,12 @@ export class InteriorScene extends Phaser.Scene {
     const kx = (k.right.isDown || k.d.isDown ? 1 : 0) - (k.left.isDown || k.a.isDown ? 1 : 0);
     const ky = (k.down.isDown || k.s.isDown ? 1 : 0) - (k.up.isDown || k.w.isDown ? 1 : 0);
     const ix = kx || (joy?.x ?? 0), iy = ky || (joy?.y ?? 0); // 键盘优先，没按键时用手机摇杆（之前室内只读键盘，手机进了 214 室就动不了）
+    const farmBusy = this.farm && (!!this.farmUi()?.isOpen || !!this.shopUi()?.isOpen); // 农场面板 / 管理员商店开着：人原地站着，别在地里乱走
+    if (this.farm && !farmBusy) for (const n of this.npcs) n.update(dt, this.map, Math.random); // 农场管理员自己在田埂上溜达
     if (this.sitting && (ix || iy)) this.standUp(ix, iy); // 坐着时一推方向就起身（站到那个方向前面）
-    if (!this.leaving) this.player.update(dt, ix, iy, k.shift.isDown || (joy?.run ?? false), this.map);
+    if (!this.leaving) this.player.update(dt, farmBusy ? 0 : ix, farmBusy ? 0 : iy, k.shift.isDown || (joy?.run ?? false), this.map);
 
-    const press = Phaser.Input.Keyboard.JustDown(k.e) || Phaser.Input.Keyboard.JustDown(k.space) || tap;
+    const press = !farmBusy && (Phaser.Input.Keyboard.JustDown(k.e) || Phaser.Input.Keyboard.JustDown(k.space) || tap);
     // 最近的 NPC
     let near: Npc | null = null, nd = 30;
     for (const n of this.npcs) { const dd = Math.hypot(n.x - this.player.x, n.y - this.player.y); if (dd < nd) { nd = dd; near = n; } }
@@ -538,6 +641,10 @@ export class InteriorScene extends Phaser.Scene {
     let spot: NonNullable<InteriorDef['interacts']>[number] | null = null, sd = Infinity;
     let dcat: Cat | null = null; // 宿舍里养的猫：走近到够得着，优先于家具 / 椅子
     if (this.dorm && !near) { let cd = CAT_REACH; for (const c of this.dormCats.values()) { const dd = c.distTo(this.player.x, this.player.y); if (dd < cd) { cd = dd; dcat = c; } } }
+    // 农场：站在地边按 E 打开农场面板（翻土/播种/浇水/收获都在里面）
+    const plotIdx = this.farm && !dcat ? this.farmPlotAt() : -1; // 不看 near：站在田边按 E 永远先开农场面板，别被溜达过来的管理员抢了键
+    const fplot = plotIdx >= 0 && this.farmData ? this.farmData.plots[plotIdx] : undefined;
+    const plotTip = plotIdx >= 0 ? `E  第 ${plotIdx + 1} 块地 · ${fplot?.c && this.farmData ? growthText(fplot, this.farmData.today) : '空地（翻土 + 播种）'}` : null;
     if (!near && !dcat) for (const a of [...(this.def.interacts ?? []), ...this.decorTalk]) {
       if (this.player.x < a.x0 || this.player.x > a.x1 || this.player.y < a.y0 || this.player.y > a.y1) continue;
       const dd = Math.hypot((a.x0 + a.x1) / 2 - this.player.x, (a.y0 + a.y1) / 2 - this.player.y);
@@ -550,10 +657,11 @@ export class InteriorScene extends Phaser.Scene {
     // 椅子：靠近按 E 坐下；坐着时按 E 起身
     let seat: (typeof this.seats)[number] | null = null;
     if (!near && !spot && !dcat && !stair && !this.sitting) { let sd2 = 26; for (const q of this.seats) { const dd = Math.hypot(q.bx - this.player.x, q.by - this.player.y); if (dd < sd2) { sd2 = dd; seat = q; } } }
-    this.hud.hint(this.sitting ? 'E / 方向键  起身' : near ? `E  和「${near.name}」交谈` : dcat ? `E  ${this.isHost ? '和' : '看看'}「${dcat.label}」${this.isHost ? '玩' : ''}` : spot ? tip(spot) : stair ? `E  ${stair.label}` : seat ? 'E  坐下' : null);
+    this.hud.hint(this.sitting ? 'E / 方向键  起身' : plotIdx >= 0 ? plotTip : near ? (this.npcShop(near) ? (this.time.now < this.chatUntil ? `E  打开柜台（买种子 / 卖菜）` : `E  和「${near.name}」聊聊`) : `E  和「${near.name}」交谈`) : dcat ? `E  ${this.isHost ? '和' : '看看'}「${dcat.label}」${this.isHost ? '玩' : ''}` : spot ? tip(spot) : stair ? `E  ${stair.label}` : seat ? 'E  坐下' : null);
     if (stair && press) { this.changeFloor(stair.to); return; }
     if (this.sitting && press) this.standUp(); else if (seat && press) this.sitDown(seat);
     if (dcat && press && !this.sitting) this.touchDormCat(dcat);
+    if (plotIdx >= 0 && press && !this.sitting) { this.farmUi()?.open(plotIdx); return; } // 开了面板就到此为止：同一下 E 不能又弹管理员的对话
     if (spot && press) { if (spot.act) this.dormAct(spot.act); else this.hud.openDialog(spot.title, [spot.text]); }
     if (near && press) {
       this.talking = near;
@@ -561,7 +669,15 @@ export class InteriorScene extends Phaser.Scene {
       const dx = this.player.x - near.x, dy = this.player.y - near.y;
       near.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
       near.sprite.setFrame(`c${near.look}_${near.facing}_0`);
-      this.hud.openDialog(near.name, near.lines);
+      const shop = this.npcShop(near);
+      if (!shop) this.hud.openDialog(near.name, near.lines);
+      else if (this.time.now < this.chatUntil) { this.chatUntil = 0; this.shopUi()?.open(shop); } // 刚聊完又按 E：开柜台（买种子 / 卖菜）
+      else { // 老板也是人：先随手聊一句，对话里写清楚再按 E 才开柜台
+        this.chatUntil = this.time.now + 4000;
+        const line = near.lines[Math.floor(Math.random() * near.lines.length)];
+        const advice = this.farmAdvice();
+        this.hud.openDialog(near.name, [line + (advice ? ` 我看了一圈：${advice}。` : ''), '要种子，还是把菜卖给我？再按一下 E 打开柜台。']);
+      }
     }
     // 走出南侧门洞
     if (!this.leaving && this.def.exit && this.player.y > (this.def.h - 1) * TILE + 6) this.leave();

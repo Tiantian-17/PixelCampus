@@ -23,7 +23,7 @@ type ShapeBase =
 
 export type Species = 'oak' | 'oakS' | 'oakL' | 'poplar' | 'ginkgo' | 'maple' | 'blossom' | 'pine' | 'willow' | 'bush';
 export type PropKind = 'lamp' | 'bench' | 'sign' | 'flowerbed' | 'stone' | 'bin' | 'bike'
-  | 'stadium' | 'pergola' | 'rockS' | 'bleacher' | 'floodlight' | 'parasolTable' | 'dockPost' | 'lampGold' | 'wallV' | 'gatePlaque' | 'mottoStone' | 'wallH' | 'pier' | 'nameStone' | 'bollard' | 'boulder' | 'flagpole' | 'railV' | 'fenceH' | 'fenceV' | 'reed' | 'lily' | 'pavilion' | 'fishStall' | 'car' | 'bikeRack' | 'noticeBoard' | 'messageBoard' | 'shop' | 'campusWall' | 'fountain' | 'monument' | 'goal' | 'hoop' | 'gateSign';
+  | 'stadium' | 'pergola' | 'rockS' | 'bleacher' | 'floodlight' | 'parasolTable' | 'dockPost' | 'lampGold' | 'wallV' | 'gatePlaque' | 'mottoStone' | 'wallH' | 'pier' | 'nameStone' | 'bollard' | 'boulder' | 'flagpole' | 'railV' | 'fenceH' | 'fenceV' | 'reed' | 'lily' | 'pavilion' | 'fishStall' | 'hollowTree' | 'car' | 'bikeRack' | 'noticeBoard' | 'messageBoard' | 'shop' | 'campusWall' | 'fountain' | 'monument' | 'goal' | 'hoop' | 'gateSign';
 
 /** 条目生效的世界放大范围：minS/maxS（缺省 1~∞）。放大专属的细节层用 minS:2，被放大后过稀的手摆条目用 maxS:1 */
 export interface ScatterOpts { minS?: number; maxS?: number; /** 蓝图 id，同 Shape.bp */ bp?: string }
@@ -39,7 +39,7 @@ export type Scatter = ScatterOpts & (
   /** 世界内文字牌（用像素字体渲染在 gateSign 之上） */
   | { kind: 'label'; text: string; x: number; y: number; size?: number; color?: string; stroke?: string; /** 画在更靠前的层（像素）：牌子挂在大建筑高处时，文字要压在楼的精灵上面 */ ds?: number; /** 给文字牌起个 id，供 interact 引用（运行时可改字） */ id?: string; note?: string }
   /** 可交互区域（站进矩形按 E）：每按一次让 id 对应的文字牌依次换成 texts 里的下一句，轮完回到原文。校名石彩蛋用 */
-  | { kind: 'interact'; id: string; rect: [number, number, number, number]; hint: string; /** 彩蛋文字（不填 = 不是彩蛋） */ texts?: string[]; /** 'board' = 打开留言板；'shop' = 商店；'wall' = 校园墙；'fishshop' = 精工湖钓具摊 */ action?: 'board' | 'shop' | 'wall' | 'fishshop'; note?: string }
+  | { kind: 'interact'; id: string; rect: [number, number, number, number]; hint: string; /** 彩蛋文字（不填 = 不是彩蛋） */ texts?: string[]; /** 'board' = 打开留言板；'shop' = 商店；'wall' = 校园墙；'fishshop' = 精工湖钓具摊；'portal' = 传送点（打开传送面板） */ action?: 'board' | 'shop' | 'wall' | 'fishshop' | 'portal'; note?: string }
   /** 自动种植：在矩形/多边形内按噪声撒林地（避开路面与楼体），species 为权重 */
   | { kind: 'grove'; species: Partial<Record<Species, number>>; poly: [number, number][]; spacing: number; threshold?: number; note?: string }
   /** 椭圆环：沿椭圆周长按 spacing（格，保持像素节奏）排 prop，如校名石岛的石球墩 */

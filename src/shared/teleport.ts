@@ -3,6 +3,7 @@
  * 地点按"地标 id"或"建筑名"从世界数据里解析（不写死坐标），所以地图编辑器改了地图也不会传到墙里；
  * 服务器再在目标附近找一个真能站的位置，并限制冷却与状态（骑车/坐着/钓鱼/战斗中不能传）。
  */
+import { FARM_POI } from './farming';
 export type TeleportGroup = '大门' | '教学' | '食堂' | '宿舍' | '湖边' | '其他';
 /** 多层建筑的某一层：传送面板里点它，服务器照常把人传到建筑门口，传到之后客户端自动进入这一层的室内（interior = 室内 id） */
 export interface TeleportFloor { label: string; interior: string }
@@ -34,8 +35,10 @@ export const TELEPORTS: readonly TeleportDef[] = [
   { id: 'dorm-4', name: '四社区', group: '宿舍', poi: 'dorm-4' },
   { id: 'intl', name: '留学生公寓', group: '宿舍', building: '留学生公寓' },
   { id: 'fish-stall', name: '精工湖钓具摊', group: '湖边', poi: 'fish-stall' },
+  // 我的农场：传到北山林地后客户端淡出进入私人农场室内（和宿舍一样的独立空间，见 docs/feature/20261112-farming/）
+  { id: 'farm', name: '我的农场', group: '其他', poi: FARM_POI },
 ];
-export const TELEPORT_GROUPS: readonly TeleportGroup[] = ['大门', '教学', '食堂', '宿舍', '湖边'];
+export const TELEPORT_GROUPS: readonly TeleportGroup[] = ['大门', '教学', '食堂', '宿舍', '湖边', '其他'];
 
 /** 传送冷却（毫秒，每个人） */
 export const TP_COOLDOWN_MS = 8000;

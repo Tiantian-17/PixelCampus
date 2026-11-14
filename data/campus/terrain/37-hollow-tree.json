@@ -1,0 +1,36 @@
+{
+ "_doc": "北山林地的地标古树「大树洞」（2026-11-13）：树洞里能钻进人，站在洞口按 E 直接回「我的农场」——这是留给玩家自己发现的彩蛋，菜单传送（TELEPORTS）里不列。树是 hollowTree 道具（美术在 tools/art/nature.ts 的 hollowTree()），叶子随季节换色。挪树：同时改这里的 x/y、下面 label 与 interact 的坐标、pois.json 的 hollow-tree。",
+ "scatter": [
+  {
+   "kind": "at",
+   "prop": "hollowTree",
+   "x": 184,
+   "y": 37,
+   "note": "山间小径内侧的大古树（小径从 172,40 走到 190,32，树在小径南侧约 2 格）"
+  },
+  {
+   "kind": "label",
+   "text": "大树洞",
+   "x": 184,
+   "y": 32.1,
+   "size": 12,
+   "color": "#ffe9a0",
+   "stroke": "#2e1a10",
+   "ds": 130,
+   "note": "树冠上方；ds 让文字压在树冠和周围小树之上"
+  },
+  {
+   "kind": "interact",
+   "id": "hollow-tree",
+   "rect": [
+    182.2,
+    37.05,
+    3.6,
+    2.3
+   ],
+   "hint": "E  钻进树洞",
+   "action": "portal",
+   "note": "站在树洞正下方按 E：直接回我的农场（彩蛋，菜单传送里不列）"
+  }
+ ]
+}

@@ -652,7 +652,106 @@ const RODS2: Record<string, () => Img> = {
   rod_bone: () => rodTier('#ece4d0', '#a89878', '#c4402e', '#ff8a6a', '#fff6e0'),
 };
 
+// ------------------------------------------------ 耕作：作物与种子（校园农场）
+/** 小白菜 */
+const cropCabbage = () => {
+  const i = new Img(16, 16);
+  i.ellipse(8, 10, 5, 4, hex('#6aac46'));
+  i.ellipse(8, 9, 3.4, 2.8, hex('#a8d878'));
+  i.set(8, 3, hex('#4e8a32')); i.set(7, 4, hex('#4e8a32')); i.set(9, 4, hex('#4e8a32'));
+  i.rect(7, 13, 2, 2, hex('#eaf2d8'));
+  return i;
+};
+/** 番茄 */
+const cropTomato = () => {
+  const i = new Img(16, 16);
+  i.ellipse(8, 9, 5, 4.6, hex('#e04a3a'));
+  i.ellipse(6, 7, 1.6, 1.2, hex('#f48878'));
+  for (const [x, y] of [[8, 3], [7, 4], [9, 4], [8, 5]]) i.set(x, y, hex('#4a9a3a'));
+  i.set(8, 5, hex('#3a7a2a'));
+  return i;
+};
+/** 辣椒 */
+const cropChili = () => {
+  const i = new Img(16, 16);
+  for (const [x, y] of [[5, 5], [5, 6], [6, 7], [6, 8], [7, 9], [7, 10], [8, 11], [8, 12], [9, 12]]) {
+    i.set(x, y, hex('#d63a2e')); i.set(x + 1, y, hex('#a82a22'));
+  }
+  i.set(5, 3, hex('#4a9a3a')); i.set(6, 3, hex('#4a9a3a')); i.set(5, 4, hex('#3a7a2a'));
+  return i;
+};
+/** 西瓜 */
+const cropWatermelon = () => {
+  const i = new Img(16, 16);
+  i.ellipse(8, 9, 6, 5, hex('#3e8a3a'));
+  for (const [x, y, h] of [[4, 7, 3], [6, 6, 5], [9, 6, 5], [11, 7, 3], [8, 5, 2]]) i.rect(x, y, 1, h, hex('#22502a'));
+  i.set(8, 13, hex('#8ab84a'));
+  i.set(4, 5, hex('#b8d878'));
+  return i;
+};
+/** 南瓜 */
+const cropPumpkin = () => {
+  const i = new Img(16, 16);
+  i.ellipse(8, 10, 6, 4.6, hex('#e8882a'));
+  for (const x of [4, 6, 8, 10, 12]) i.rect(x, 6, 1, 8, hex('#c86a1a'));
+  i.rect(7, 3, 2, 3, hex('#5a7a2a')); i.set(9, 3, hex('#4a6a22'));
+  i.set(3, 8, hex('#f4b060'));
+  return i;
+};
+/** 胡萝卜 */
+const cropCarrot = () => {
+  const i = new Img(16, 16);
+  for (let y = 0; y < 9; y++) {
+    const w = Math.max(1, 4 - Math.floor(y / 2));
+    i.rect(8 - w, 6 + y, w * 2, 1, hex(y < 3 ? '#f09030' : '#e07820'));
+  }
+  for (const [x, y] of [[5, 3], [6, 2], [7, 4], [9, 3], [10, 2], [8, 2]]) i.set(x, y, hex(y % 2 ? '#6ab84a' : '#4a9a3a'));
+  return i;
+};
+/** 冬小麦 */
+const cropWheat = () => {
+  const i = new Img(16, 16);
+  i.rect(7, 4, 2, 11, hex('#d8b048'));
+  for (const y of [3, 5, 7, 9, 11]) { i.set(5, y, hex('#f0d070')); i.set(6, y, hex('#b8861a')); i.set(9, y, hex('#f0d070')); i.set(10, y, hex('#b8861a')); }
+  i.rect(7, 15, 2, 1, hex('#b8861a'));
+  return i;
+};
+/** 大白菜 */
+const cropNapa = () => {
+  const i = new Img(16, 16);
+  i.ellipse(8, 9, 4.4, 5.4, hex('#d8e8b0'));
+  i.ellipse(8, 12, 3.8, 2.6, hex('#f4f8e0'));
+  i.rect(7, 4, 2, 10, hex('#a8c878'));
+  i.set(5, 6, hex('#b8d888')); i.set(11, 6, hex('#b8d888'));
+  return i;
+};
+/** 种子袋：一张纸袋 + 一块作物色的封签（8 种作物共用形状，只换颜色） */
+const seedBag = (paper: string, rim: string, mark: string) => art([
+  '................',
+  '....rrrrrrrr....',
+  '...rPPPPPPPPR...',
+  '...rPmmmmmmPR...',
+  '...rPmMMMMmPR...',
+  '...rPmMMMMmPR...',
+  '...rPmmmmmmPR...',
+  '...rPPPPPPPPR...',
+  '...rPPPPPPPPR...',
+  '...rPPPPPPPPR...',
+  '...rPPPPPPPPR...',
+  '...rPPPPPPPPR...',
+  '....rrrrrrrr....',
+  '................',
+  '................',
+  '................',
+], { r: rim, P: paper, R: rim, m: mark, M: mark });
+
 export const ICONS: Record<string, () => Img> = {
+  crop_cabbage: cropCabbage, crop_tomato: cropTomato, crop_chili: cropChili, crop_watermelon: cropWatermelon,
+  crop_pumpkin: cropPumpkin, crop_carrot: cropCarrot, crop_wheat: cropWheat, crop_napa: cropNapa,
+  seed_cabbage: seedBag('#f2ecd6', '#b8a888', '#6aac46'), seed_tomato: seedBag('#f2ecd6', '#b8a888', '#e04a3a'),
+  seed_chili: seedBag('#f2ecd6', '#b8a888', '#d63a2e'), seed_watermelon: seedBag('#f2ecd6', '#b8a888', '#3e8a3a'),
+  seed_pumpkin: seedBag('#f2ecd6', '#b8a888', '#e8882a'), seed_carrot: seedBag('#f2ecd6', '#b8a888', '#f09030'),
+  seed_wheat: seedBag('#f2ecd6', '#b8a888', '#d8b048'), seed_napa: seedBag('#f2ecd6', '#b8a888', '#a8c878'),
   rod_carbon: () => rodTier('#3a4250', '#1e242c', '#b8c4cc', '#f0f6fa', '#7a8ca0'), rod_golden: () => rodTier('#e8b83a', '#a8741a', '#d6405c', '#ff9aa8', '#fff0a0'),
   ...RODS2,
   bait_glow: baitJar('#3a5aa8', '#243a78', 'glow'), bait_season: baitJar('#4a9a4a', '#2e6a2e', 'leaf'), bait_wild: baitJar('#b87a3a', '#7a4e1e', 'grub'),

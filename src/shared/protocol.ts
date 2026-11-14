@@ -28,6 +28,7 @@ import type { DroppedBike } from './bikes';
 import type { PartyMsg } from './party';
 import type { HallData } from './hall';
 import type { TradeOffer, TradeSide } from './trade';
+import type { FarmLogEntry, FarmOp, FarmPlot } from './farming';
 import type { ChannelId, ChannelState } from './channels';
 import type { Mon } from './mons';
 import type { BEvent } from './battle';
@@ -195,6 +196,9 @@ export type ClientMsg =
   | { t: 'fish_reel' }
   /** 拉鱼小游戏结束：win = 拉满了；perfect = 鱼几乎一直在绿条里 */
   | { t: 'fish_end'; win: boolean; perfect?: boolean }
+  /** 校园农场：看自己的田（省略 uid）/ 看好友的田；操作一块地（uid 省略 = 自己的） */
+  | { t: 'farm_get'; uid?: number }
+  | { t: 'farm_op'; op: FarmOp; slot: number; seed?: string; uid?: number }
   /** 校园币与商店：买（qty 份）、卖（n 件）、一键卖出；余额主动发 coins */
   | { t: 'coins_get' }
   | { t: 'shop_buy'; id: string; qty: number }
@@ -440,6 +444,12 @@ export type ServerMsg =
    */
   | { t: 'fish_state'; s: 'idle' | 'wait' | 'bite' | 'fight' | 'catch' | 'miss'; msg?: string; x?: number; y?: number; id?: string; cm?: number; kg?: number; isNew?: boolean; record?: boolean; junk?: boolean; perfect?: boolean; /** fight：拉鱼小游戏的参数（鱼是什么要等拉上来才知道） */ seed?: number; diff?: number; move?: 'smooth' | 'mixed' | 'dart'; /** fight：配件给的拉鱼加成、神话鱼的皇冠 / 中途发力 */ bar?: number; sink?: number; cling?: number; drop?: number; burst?: boolean; crown?: boolean; /** bite：声呐浮标告诉你是什么鱼（只发图鉴里已有的） */ sonar?: string; /** catch：双钓（钓到两条）、顺带钓上来的盲盒、河蚌里的珍珠、神话鱼首次的奖励 */ twin?: boolean; box?: string; pearl?: boolean; first?: boolean; /** catch：钓鱼经验（分项）和升级后的等级 */ xp?: { total: number; base: number; perfect: number; isNew: number; capped?: boolean }; lv?: number }
   | RunMsg
+  /**
+   * 校园农场：一整份田的状态（今天还能偷几次、最近 20 条被偷记录）。浇水不花钱、不限次数，所以没有次数统计。
+   * mine = 是不是自己的田；今天的游戏日由服务器给（客户端不用自己算，避免设备时钟偏差）。
+   */
+  | { t: 'farm'; uid: number; name: string; mine: boolean; today: number; plots: FarmPlot[]; stealLeft: number; log: FarmLogEntry[] }
+  | { t: 'farm_result'; ok: boolean; msg: string; /** 哪个农活的结果（客户端据此做反馈，不用解析文案；farm_get 没有这个字段） */ op?: FarmOp }
   | PartyMsg
   /** 留在原地的共享单车：整份列表（进来时）/ 新停下一辆 / 一辆没了（被骑走或超时消失） */
   | { t: 'bike_drops'; list: DroppedBike[] }

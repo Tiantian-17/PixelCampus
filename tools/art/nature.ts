@@ -3,7 +3,7 @@
  * 尺度约定（与 docs/map/SCALE.md 一致）：16px = 1 tile；成年阔叶树冠宽约 3 tile、总高约 3.5 tile，
  * 人物 16×32，所以人站在树旁大约到树干中段 —— 与星露谷比例一致。
  */
-import { Img, Rng, hash2, vnoise, type RGBA } from './px.ts';
+import { Img, Rng, hash2, vnoise, shade, mix, hex, type RGBA } from './px.ts';
 import { PAL } from './palette.ts';
 
 export interface Sprite {
@@ -208,6 +208,68 @@ export function willow(seed: number): Sprite {
   const out = img.outlined(PAL.leafOutline);
   groundShadow(out, 28, H, 18, 4);
   return { img: out, ax: 28, ay: H + 1, block: { x: -3, y: -4, w: 6, h: 5 } };
+}
+
+/**
+ * 大树洞：北山林地的地标古树（树洞里能钻进人，站在洞口按 E 打开传送面板）。
+ * 尺寸 120×132，树冠比普通阔叶树大一圈、树干粗到能开一个拱形大洞；洞里透出暖光，远处一眼就认出来。
+ * 树冠颜色跟 PAL.leaf 走，所以四季图集里会自动换成对应的叶色。
+ */
+export const HOLLOW_TREE_W = 120, HOLLOW_TREE_H = 132;
+export function hollowTree(): Sprite {
+  const W = HOLLOW_TREE_W, H = HOLLOW_TREE_H;
+  const baseY = H - 2, cx = Math.floor((W + 2) / 2);
+  const trW = 52, trH = 72, bcx = trW / 2;
+  const [t0, t1, t2, t3] = PAL.trunk;
+  const tr = new Img(trW, trH);
+  // ---- 树干：顶部半宽 8、贴地 15，最后几行板根往外张；光从左上来，左亮右暗
+  for (let y = 0; y < trH; y++) {
+    const t = y / (trH - 1);
+    const half = 8 + t * 7 + (t > 0.88 ? (t - 0.88) * 150 : 0);
+    for (let x = Math.floor(bcx - half); x <= Math.ceil(bcx + half); x++) {
+      const nx = (x - bcx) / half;
+      let c = nx < -0.45 ? t3 : nx < -0.05 ? t2 : nx < 0.5 ? t1 : t0;
+      if (hash2(x, y, 91) < 0.16) c = shade(c, 0.88);        // 纵向树皮裂纹
+      else if (hash2(x, y, 92) < 0.05) c = shade(c, 1.12);
+      if (t > 0.55 && hash2(x, y, 95) < 0.07) c = PAL.leaf[1]; // 靠地的青苔
+      tr.set(x, y, c);
+    }
+  }
+  // 一个老树结
+  tr.ellipse(bcx - 11, 22, 3.5, 6, t0); tr.ellipse(bcx - 11, 22.5, 2, 4, t2);
+  // ---- 大树洞：拱形，越靠底越宽、越亮（像里面透出暖光）；洞口一圈浅色木头包边
+  const hy = trH - 1, hh = 30, hw = 11;
+  for (let dy = 0; dy <= hh; dy++) {
+    const y = hy - dy, k = dy / hh;
+    const half = Math.round(hw * Math.sqrt(Math.max(0, 1 - k * k * 0.84)));
+    for (let x = Math.round(bcx - half); x <= Math.round(bcx + half); x++) {
+      const d = Math.abs(x - bcx) / Math.max(1, half), g = 1 - k;
+      const c = d > 0.8 ? shade(t1, 1.18) : mix(hex('#0d0703'), hex('#ffc866'), 0.05 + g * g * 0.55);
+      tr.set(x, y, c);
+    }
+  }
+  // 洞里贴地的一小团亮光（传送点的"活气"）
+  for (const [x, y, r] of [[bcx, hy - 2, 3.4], [bcx, hy - 5, 2.2]] as [number, number, number][]) {
+    for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) if ((i / r) ** 2 + (j / r) ** 2 <= 1) tr.set(x + i, y + j, mix(hex('#ffc866'), hex('#fff2c8'), 0.55 - Math.hypot(i, j) / (r * 2.2)));
+  }
+  const trO = tr.outlined(hex('#2e1c10'));
+  // ---- 树冠：一圈大小不一的叶团拼成一个大圆冠，底边比普通阔叶树更低，把树干上半截藏起来
+  const cw = W - 8, ch = 84;
+  const blobs: Blob[] = [];
+  for (let i = 0; i < 18; i++) {
+    const a = hash2(i, 1, 31) * Math.PI * 2;
+    const rad = i === 0 ? 0 : Math.sqrt(hash2(i, 2, 33)) * 0.33 * cw;
+    const rr = cw * (0.17 + hash2(i, 4, 35) * 0.09);
+    blobs.push({ cx: cw / 2 + Math.cos(a) * rad, cy: ch * 0.54 + Math.sin(a) * rad * 0.62, r: rr, ry: rr * (0.85 + hash2(i, 6, 37) * 0.2) });
+  }
+  const can = paintCanopy(cw, ch, blobs, PAL.leaf, 23, { speckle: 0.012 });
+  const canO = can.outlined(PAL.leafOutline);
+  const img = new Img(W + 2, H + 4);
+  img.blit(trO, cx - Math.floor(trO.w / 2), baseY - trH);
+  img.blit(canO, cx - Math.floor(canO.w / 2), baseY - trH - Math.round(ch * 0.58));
+  const out = img.outlined(PAL.leafOutline, false);
+  groundShadow(out, cx, baseY, cw * 0.46, 5);
+  return { img: out, ax: cx, ay: baseY + 1, block: { x: -13, y: -10, w: 26, h: 11 } };
 }
 
 /** 灌木丛 */

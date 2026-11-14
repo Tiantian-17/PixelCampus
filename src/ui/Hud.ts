@@ -9,6 +9,8 @@ export class Hud {
   private tilesW = 1; private tilesH = 1;
   private pages: string[] = [];
   private pageIdx = 0;
+  /** 这段对话翻完（或被 Esc 关掉）时的回调：树洞小剧情用它在对话结束后接着传送 */
+  private onDialogDone?: () => void;
   dialogOpen = false;
   /** 管理员：点开大地图后点任意位置传送（格坐标）；不设置就是普通玩家，地图只能看 */
   private onMapPick: ((tx: number, ty: number) => void) | null = null;
@@ -62,10 +64,11 @@ export class Hud {
     h.textContent = document.body.classList.contains('touch') ? text.replace(/^E\s+/, '👆 ') : text; h.classList.remove('hidden');
   }
 
-  /** 打开多页对话；pages 逐页显示，advanceDialog() 翻页，翻完自动关闭 */
-  openDialog(title: string, pages: string | string[]) {
+  /** 打开多页对话；pages 逐页显示，advanceDialog() 翻页，翻完自动关闭；onDone 在对话关闭（翻完或 Esc）时触发一次 */
+  openDialog(title: string, pages: string | string[], onDone?: () => void) {
     this.pages = Array.isArray(pages) ? pages : [pages];
     this.pageIdx = 0;
+    this.onDialogDone = onDone;
     $('dialog-title').textContent = title;
     $('dialog').classList.remove('hidden');
     this.dialogOpen = true; this.hint(null);
@@ -82,7 +85,7 @@ export class Hud {
     if (this.pageIdx < this.pages.length - 1) { this.pageIdx++; this.renderPage(); return true; }
     this.closeDialog(); return false;
   }
-  closeDialog() { $('dialog').classList.add('hidden'); this.dialogOpen = false; }
+  closeDialog() { $('dialog').classList.add('hidden'); this.dialogOpen = false; const cb = this.onDialogDone; this.onDialogDone = undefined; cb?.(); }
 
   /** 小地图图片每格几像素（和 tools/world/compile.ts 的 MS 一致）；小地图按这个比例 1:1 显示，不缩放，像素才干净 */
   private static readonly MM_PX = 3;

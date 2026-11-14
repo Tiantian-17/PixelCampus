@@ -2,7 +2,7 @@
  * 商店界面用的纯函数（分类、筛选、购买数量）：和界面分开，方便测试。
  * 规则（价格、行情、限额）全在 shared/economy.ts，服务器结算；这里只管"怎么分页、怎么筛选、一次能买几份"。
  */
-import { EXTRA_SELL, SHOP, type ShopItem } from '@/shared/economy';
+import { CROP_SELL, EXTRA_SELL, SHOP, sellList, type ShopItem } from '@/shared/economy';
 import { decorDef } from '@/shared/decor';
 import { fishDef } from '@/shared/fishing';
 import { decorRefund } from '@/shared/decor';
@@ -43,6 +43,13 @@ export function shopItemsFor(tab: ShopTab, chip: string, stall: boolean): ShopIt
 }
 /** 这个页签里实际有商品的筛选标签（空的标签不显示） */
 export const shopChipsFor = (tab: ShopTab, stall: boolean): string[] => SHOP_CHIPS[tab].filter((c) => shopItemsFor(tab, c, stall).length > 0);
+
+// ---------------------------------------------------------------- 农场管理员（农场里的 NPC）
+/** 管理员卖的：只有作物种子（一包种一块地），按商店目录顺序 */
+export const farmSeeds = (): ShopItem[] => SHOP.filter((s) => s.id.startsWith('seed_'));
+/** 管理员收的：只有作物（固定价，没有行情 / 钓鱼加成），顺序和商店的出售页一致 */
+export const farmSellList = (inv: Record<string, number>, day: number, bonus = 0) =>
+  sellList(inv, day, bonus).filter((r) => !!CROP_SELL[r.id]);
 
 /** 一次最多能买几份：受校园币、背包堆叠上限（stack）、每份个数 n 限制；单件物品（stack=1）有了就不能再买 */
 export function buyMax(s: ShopItem, coins: number, have: number, stack: number): number {

@@ -1,0 +1,36 @@
+/* ---------- 我的农场（FarmPanel：进农场室内后走到耕地边按 E 打开） ---------- */
+.box.farm { width: min(720px, 100%); box-sizing: border-box; padding: 10px 12px; }
+.farm-sub { font-size: 13px; opacity: .85; margin: 2px 0 4px; }
+.farm-tabs { display: flex; gap: 6px; }
+.farm-tabs .cx-tab { flex: 1; min-height: 32px; padding: 3px 8px; font-size: 14px; font-family: inherit; color: var(--ink); }
+.farm-body { display: flex; flex-direction: column; gap: 8px; max-height: min(62vh, 520px); overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 4px; }
+
+.farm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+@media (max-width: 520px) { .farm-grid { grid-template-columns: repeat(2, 1fr); } }
+.farm-plot { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 6px 6px; background: var(--paper-d, #f3e6c8); border: 3px solid var(--wood-l, #c9a56b); min-height: 132px; }
+.farm-plot.empty { background: #e8d6b0; }
+.farm-plot.ripe { border-color: #d8a12a; box-shadow: inset 0 0 0 2px #f2d98a; }
+.farm-plot.focus { border-color: #6f9d4a; box-shadow: inset 0 0 0 2px #cfe8b8; }
+.farm-idx { position: absolute; top: 2px; left: 5px; font-size: 11px; opacity: .6; }
+.farm-ico { display: block; line-height: 0; }
+.farm-ico-empty { width: 32px; height: 32px; border: 2px dashed var(--wood-l, #c9a56b); border-radius: 50%; }
+.farm-state { font-size: 13px; text-align: center; line-height: 1.3; }
+.farm-stolen { font-size: 11px; color: #b02a1a; }
+.farm-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-top: auto; }
+.farm-btn { padding: 2px 8px; min-height: 28px; font-size: 13px; }
+.farm-btn:disabled { opacity: .45; cursor: default; }
+.farm-tip { font-size: 12px; opacity: .8; }
+
+.farm-log { border-top: 2px dashed var(--wood-l, #c9a56b); padding-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.farm-log-title { font-size: 13px; font-weight: bold; }
+.farm-log-row { font-size: 13px; }
+
+.farm-seeds { display: flex; flex-direction: column; gap: 6px; }
+.farm-seed { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: var(--paper-d, #f3e6c8); border: 2px solid var(--wood-l, #c9a56b); }
+.farm-seed.on { border-color: #d8a12a; background: #f6e6b8; }
+.farm-seed-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.farm-seed-name { font-size: 14px; }
+.farm-seed-note { font-size: 12px; opacity: .8; line-height: 1.35; }
+.farm-seed-n { font-size: 13px; opacity: .8; }
+.farm-empty { font-size: 13px; opacity: .75; padding: 8px 2px; }
+body.touch .farm-btn { min-height: 36px; padding: 4px 10px; }

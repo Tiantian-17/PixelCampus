@@ -54,7 +54,7 @@ export interface WorldFile {
   /** 世界内文字牌 */
   labels: { text: string; x: number; y: number; size: number; /** 画在更靠前的层（像素） */ ds?: number; color?: string; stroke?: string; /** 在文字下画深色底牌（门头招牌） */ plate?: boolean; /** 运行时可改字的文字牌 id（见 interacts） */ id?: string }[];
   /** 可交互区域（像素坐标矩形）：站进去按 E，id 对应的文字牌依次换成 texts，轮完回到原文 */
-  interacts?: { id: string; x: number; y: number; w: number; h: number; hint: string; texts: string[]; /** 'board' = 打开留言板；'shop' = 商店；'wall' = 校园墙；不填 = 校名石彩蛋那类"换字" */ action?: 'board' | 'shop' | 'wall' | 'fishshop' }[];
+  interacts?: { id: string; x: number; y: number; w: number; h: number; hint: string; texts: string[]; /** 'board' = 打开留言板；'shop' = 商店；'wall' = 校园墙；'fishshop' = 钓具摊；'portal' = 传送面板；不填 = 校名石彩蛋那类"换字" */ action?: 'board' | 'shop' | 'wall' | 'fishshop' | 'portal' }[];
   /** 水面格：[行 y, 起 x, 止 x)（半开区间）的连续段；钓鱼据此判断面前是不是水 */
   waterRuns?: [number, number, number][];
   /** 草地格位图（每格 1 位，行优先，base64）：精灵遭遇只在草地上发生 */

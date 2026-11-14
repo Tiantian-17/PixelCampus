@@ -61,6 +61,15 @@
   "desc": "精工湖北侧的山林。"
  },
  {
+  "id": "hollow-tree",
+  "name": "大树洞",
+  "kind": "landmark",
+  "x": 184,
+  "y": 39.2,
+  "r": 2,
+  "desc": "北山林地山间小径旁的老树，树洞里能钻进人（按 E 直接回到你的农场）。"
+ },
+ {
   "id": "taiji-garden",
   "name": "太极花园",
   "kind": "area",

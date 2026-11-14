@@ -14,6 +14,7 @@ import type { QuestState } from '@/shared/quests';
 import type { FishLog } from '@/shared/fishing';
 import type { Equip } from '@/shared/gear';
 import type { GearLog } from '@/shared/fishdex';
+import type { FarmOp } from '@/shared/farming';
 import type { RunMsg } from '@/shared/run';
 import type { FriendLoc } from '@/shared/where';
 import type { DroppedBike } from '@/shared/bikes';
@@ -179,6 +180,8 @@ export interface NetHandlers {
   /** 钓鱼状态（见协议）与图鉴 */
   fishState?: (m: Extract<ServerMsg, { t: 'fish_state' }>) => void;
   fishdex?: (log: Record<string, FishLog>) => void;
+  farm?: (m: Extract<ServerMsg, { t: 'farm' }>) => void;
+  farmResult?: (m: Extract<ServerMsg, { t: 'farm_result' }>) => void;
   /** 今天的任务进度；fresh = 这次刚完成的任务 */
   quests?: (list: QuestState[], full: number, fresh?: string[]) => void;
   /** 坐下结果（成功时 x/y 是座位位置）/ 别人（含自己）做了表情 */
@@ -393,6 +396,8 @@ export class NetClient implements ChatTransport {
       case 'run_invite': case 'run_state': case 'run_end': case 'run_gone': case 'run_best': this.handlers.run?.(m); break;
       case 'fish_state': this.handlers.fishState?.(m); break;
       case 'fishdex': this.handlers.fishdex?.(m.log); break;
+      case 'farm': this.handlers.farm?.(m); break;
+      case 'farm_result': this.handlers.farmResult?.(m); break;
       case 'quests': this.handlers.quests?.(m.list, m.full, m.fresh); break;
       case 'sit_result': this.handlers.sitResult?.(m.ok, m.msg, m.x, m.y); break;
       case 'emote': this.handlers.emote?.(m.pid, m.e); break;
@@ -551,6 +556,12 @@ export class NetClient implements ChatTransport {
   fishEnd(win: boolean, perfect: boolean) { this.tx({ t: 'fish_end', win, ...(perfect ? { perfect: true } : {}) }); }
   fishCancel() { this.tx({ t: 'fish_cancel' }); }
   getFishdex() { this.tx({ t: 'fishdex_get' }); }
+  /** 校园农场：看自己的田 / 看别人的田（uid 省略 = 自己） */
+  getFarm(uid?: number) { this.tx(uid ? { t: 'farm_get', uid } : { t: 'farm_get' }); }
+  /** 校园农场：操作一块地（翻土/播种/浇水/收获/清除/偷/帮浇）；uid 省略 = 自己的地 */
+  farmOp(op: FarmOp, slot: number, opt: { seed?: string; uid?: number } = {}) {
+    this.tx({ t: 'farm_op', op, slot, ...(opt.seed ? { seed: opt.seed } : {}), ...(opt.uid ? { uid: opt.uid } : {}) });
+  }
   getQuests() { this.tx({ t: 'quest_get' }); }
   getTitles() { this.tx({ t: 'title_get' }); }
   setTitle(id: string) { this.tx({ t: 'title_set', id }); }

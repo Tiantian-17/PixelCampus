@@ -191,7 +191,7 @@ function genProps() {
   for (let i = 0; i < 3; i++) add(`parasolTable_${i}`, P.parasolTable(i));
   add('fenceH', P.fenceIron()); add('fenceV', P.fenceIronV()); add('wallV', P.wallV()); add('gatePlaque', P.gatePlaque()); add('mottoStone', P.mottoStone());
   add('lampGold', P.lampGold()); add('wallH', P.wallH()); add('pier', P.pier()); add('nameStone', P.nameStone()); add('bollard', P.bollard()); add('boulder', P.boulder()); add('flagpole', P.flagpole()); add('railV', P.railV());
-  P.flagFrames().forEach((im, i) => add(`flag_${i}`, { img: im, ax: 0, ay: 0 })); add('pavilion', P.pavilion()); add('bikeRack', P.bikeRack()); add('noticeBoard', P.noticeBoard()); add('messageBoard', P.messageBoard()); add('shop', PZ.shop()); add('campusWall', PZ.campusWall()); add('fishStall', PZ.fishStall());
+  P.flagFrames().forEach((im, i) => add(`flag_${i}`, { img: im, ax: 0, ay: 0 })); add('pavilion', P.pavilion()); add('bikeRack', P.bikeRack()); add('noticeBoard', P.noticeBoard()); add('messageBoard', P.messageBoard()); add('shop', PZ.shop()); add('campusWall', PZ.campusWall()); add('fishStall', PZ.fishStall()); add('hollowTree', N.hollowTree());
   add('stadium', P.stadium(S)); add('fountain', P.fountain()); add('monument', P.monument()); add('goal', P.goal()); add('hoop', P.hoop()); add('gateSign', P.gateSign());
   for (let i = 0; i < 7; i++) add(`car_${i}`, P.car(i));
   for (let i = 1; i <= 3; i++) { add(`reed_${i}`, P.reed(i)); add(`lily_${i}`, P.lily(i)); }
