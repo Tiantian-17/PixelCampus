@@ -36,6 +36,8 @@
 - 协议：`farm_result` 新增可选字段 `op`（哪个农活的结果），第一次收获的旁白改用它判定，不再依赖服务端文案；一次性标记改成**真弹出前才写**（600ms 内刷新不会白丢），并加内存守卫避免连收多块地弹多次。
 - 清理耕地系统的残留：删掉没人调用的 `FarmPanel.openFor()`、面板上从来没写样式的 `tilled` class、CSS 里没用的 `.farm-seed.off`；把写着「6 块地」「枯萎」「600 个 tile」的过期注释 / 美术说明（`farming.ts` 头注释、`farm.json` 的 `_doc`、`art/farm-scene/layout.json`、`SOURCE.md`）统一到现状（16 块、4 阶段嫩芽、无枯萎、布局以 `FARM_PLOTS` 为准）。
 （未部署；**服务端需同步**：`farm_get` / `farm_op` handler 与存档字段 `FarmSave { plots, day, sl, log }` 见 `docs/feature/20261112-farming/plan.md` §3.2、§3.3；改了资源的话要先重建 `public/assets/generated`。）
+**服务端（私有仓库，2026-11-14 补）**：`farm-handler`（`farm_get` / `farm_op`：翻土 / 播种 / 浇水 / 收获 / 帮浇 / 偷摘，位置按 `north-hill` + `FARM_REACH` 校验，好友才能看田 / 偷 / 帮浇，被偷留日志）、存档字段 `fm`（旧档案缺省 = 空田，无需迁移）、农场管理员商店模式（在农场范围只能买种子、卖作物）。主人已确认接受农场的 AI 生成美术。
+（2026-11-14 已部署。）
 
 ## 2026.11.13（室内修复：传送、角色造型）更新内容
 **修复**
